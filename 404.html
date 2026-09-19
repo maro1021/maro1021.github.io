@@ -1527,6 +1527,33 @@ body.public-view .publicBadge{display:inline-flex}body.public-view #settingsBtn,
 .siteLogoPreview img{width:100%;height:100%;object-fit:cover;display:block}
 .siteLogoControls{display:flex;flex-direction:column;gap:8px;min-width:0}.siteLogoControls .inline{margin:0}.siteLogoControls .hint{line-height:1.45}
 @media(max-width:520px){.siteLogoEdit{grid-template-columns:62px minmax(0,1fr);gap:10px;padding:10px}.siteLogoPreview{width:62px;height:62px;border-radius:17px}.siteLogoControls .inline{gap:6px}.siteLogoControls .btn{padding:8px 9px}}
+
+
+/* v1.47 — mobile book opening keeps the same landscape proportions as desktop. */
+@media(max-width:760px){
+  .bookOpeningStage{
+    padding:18px 10px!important;
+    place-items:center!important;
+  }
+  .openingBook{
+    width:min(92vw,980px)!important;
+    height:auto!important;
+    min-height:0!important;
+    aspect-ratio:980 / 650!important;
+    max-height:none!important;
+    transform:translateX(-24%) rotateX(9deg) rotateZ(-1.2deg) scale(.72)!important;
+  }
+  .openingBook .bookFrontCover{padding:10px 10px 12px!important}
+  .openingBook .coverLabel{gap:6px!important}
+  .openingBook .coverKicker{font-size:7px!important;padding:3px 7px!important}
+  .openingBook .bookNameplate{
+    padding:5px 10px 6px!important;
+    max-width:94%!important;
+    min-width:42%!important;
+    font-size:clamp(11px,3.5vw,17px)!important;
+  }
+  .openingBook .bookCoverPhoto{border-radius:8px 10px 8px 8px!important}
+}
 </style>
 <!-- Prompt Atlas v1.45 · share server controls hidden -->
 </head>

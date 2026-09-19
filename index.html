@@ -1755,7 +1755,7 @@ function sampleCharacters(genres){
  ];
  return rows.map((x,i)=>{const img=dataUrlFromText(x[0],...x[7]);return{id:uid('char'),name:x[0],description:x[1],genre:x[2],classifications:x[3],attributes:x[4],tags:x[5],favorite:i===0||i===3,privateLocked:false,cardImage:img,cardImageOriginal:img,cardImageOriginalName:`${x[0]}-card.svg`,cardImageOriginalType:'image/svg+xml',cardImageZoom:1,cardImageX:50,cardImageY:50,detailImage:img,detailImageOriginal:img,detailImageOriginalName:`${x[0]}-detail.svg`,detailImageOriginalType:'image/svg+xml',detailImageZoom:1,detailImageX:50,detailImageY:50,refs:[],chapters:[makeChapter('챕터 1',[makeBlock('기본 프롬프트',x[8]),makeBlock(i%2?'정장':'사복',i%2?'tailored suit, dress shirt':'casual knit, dark slacks')]),makeChapter('챕터 2',[makeBlock('추가 프롬프트','')])],createdAt:t-(i+1)*86400000,updatedAt:t-(i+1)*3600000,order:i};});
 }
-const defaultState=()=>{const genres=defaultGenres();return{version:12,genres,attributes:defaultAttributes(),globalTags:['남캐','여캐','수인','이중각성','제복','정장','전투복'],characters:sampleCharacters(genres),settings:{...DEFAULT_SETTINGS,genre:genres[0].name,role:'all'}}};
+const defaultState=()=>{const genres=defaultGenres();return{version:12,genres,attributes:defaultAttributes(),globalTags:['남캐','여캐','수인','이중각성','제복','정장','전투복'],characters:[],settings:{...DEFAULT_SETTINGS,genre:genres[0].name,role:'all'}}};
 function migrateState(st){
  if(!st||!Array.isArray(st.characters))return defaultState();
  st.version=14; st.settings={...DEFAULT_SETTINGS,...(st.settings||{})};st.settings.siteLogo=String(st.settings.siteLogo||'');if(st.settings.sort==='favorite')st.settings.sort='manual';delete st.settings.favoriteOnly;
@@ -1800,7 +1800,7 @@ function migrateState(st){
  const current=getGenre(st.settings.genre);if(st.settings.role!=='all'&&!current?.classifications.some(r=>r.id===st.settings.role))st.settings.role='all';delete st.settings.category;return st;
 }
 let state;
-try{state=migrateState(JSON.parse(localStorage.getItem('promptAtlasStateV1'))||defaultState())}catch{state=defaultState()}
+try{state=migrateState(JSON.parse(localStorage.getItem('promptAtlasSharedStateV1'))||defaultState())}catch{state=defaultState()}
 let search='';let editDraft=null;let activeDetail=null;let activeDetailChapter=null;let activePhotoIndex=0;let imagePasteTarget='card';let activeGenreLockControl=null;
 const sessionViewUnlocks=new Set();
 const sessionPrivateUnlocks=new Set();
@@ -1824,7 +1824,7 @@ function renderGenreLockControl(){if(!activeGenreLockControl)return;const {i,typ
 }
 
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-function save(){try{localStorage.setItem('promptAtlasStateV1',JSON.stringify(state))}catch(e){toast('저장 공간이 부족할 수 있어요. 큰 이미지는 백업 후 줄여주세요.')} }
+function save(){try{localStorage.setItem('promptAtlasSharedStateV1',JSON.stringify(state))}catch(e){toast('저장 공간이 부족할 수 있어요. 큰 이미지는 백업 후 줄여주세요.')} }
 function toast(msg){const el=$('#toast');el.textContent=msg;el.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),1800)}
 function genreColor(name){return state.genres.find(g=>g.name===name)?.color||'#737b8f'}
 function openOverlay(id){$('#'+id).classList.add('open');document.body.style.overflow='hidden'}

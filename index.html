@@ -1461,7 +1461,7 @@ body.public-view .publicBadge{display:inline-flex}body.public-view #settingsBtn,
     max-height:none!important;
     aspect-ratio:980 / 650!important;
     animation:mobileBookFrameOpenFit 2.24s cubic-bezier(.2,.78,.18,1) both!important;
-    transform:translateX(-22%) rotateX(9deg) rotateZ(-1.2deg) scale(.72)!important;
+    transform:translateX(-22%) rotateX(9deg) rotateZ(-1.2deg) scale(.72);
     transform-origin:center center!important;
   }
 }
@@ -1572,7 +1572,7 @@ body.public-view .publicBadge{display:inline-flex}body.public-view #settingsBtn,
     min-height:0!important;
     aspect-ratio:980 / 650!important;
     max-height:none!important;
-    transform:translateX(-24%) rotateX(9deg) rotateZ(-1.2deg) scale(.72)!important;
+    transform:translateX(-24%) rotateX(9deg) rotateZ(-1.2deg) scale(.72);
   }
   .openingBook .bookFrontCover{padding:10px 10px 12px!important}
   .openingBook .coverLabel{gap:6px!important}
@@ -1587,6 +1587,154 @@ body.public-view .publicBadge{display:inline-flex}body.public-view #settingsBtn,
 }
 </style>
 <!-- Prompt Atlas v1.45 · share server controls hidden -->
+
+<style>
+/* v1.49 — definitive mobile book-opening fit. This MUST stay after older mobile book overrides. */
+@keyframes mobileBookFrameOpenFinal{
+  0%{transform:translateX(-22%) rotateX(7deg) rotateZ(-1deg) scale(.72)}
+  26%{transform:translateX(-22%) rotateX(7deg) rotateZ(-1deg) scale(.72)}
+  44%{transform:translateX(-18%) rotateX(5deg) rotateZ(-.6deg) scale(.78)}
+  76%{transform:translateX(-5%) rotateX(2deg) rotateZ(0) scale(.95)}
+  100%{transform:translateX(0) rotateX(0) rotateZ(0) scale(1)}
+}
+@media(max-width:760px){
+  .bookOpeningStage{
+    inset:0!important;
+    width:100%!important;
+    height:100%!important;
+    padding:14px 8px!important;
+    display:grid!important;
+    place-items:center!important;
+    overflow:hidden!important;
+    box-sizing:border-box!important;
+  }
+  .openingBook{
+    width:min(84vw,760px)!important;
+    height:auto!important;
+    min-height:0!important;
+    max-width:none!important;
+    max-height:none!important;
+    aspect-ratio:980 / 650!important;
+    margin:0!important;
+    left:auto!important;
+    right:auto!important;
+    top:auto!important;
+    bottom:auto!important;
+    transform-origin:center center!important;
+    transform:translateX(-22%) rotateX(7deg) rotateZ(-1deg) scale(.72);
+    animation:mobileBookFrameOpenFinal 2.24s cubic-bezier(.2,.78,.18,1) both!important;
+  }
+}
+@media(max-width:420px){
+  .openingBook{width:84vw!important}
+}
+</style>
+
+
+<style>
+/* v1.52 — mobile opened-book final: larger, fully visible, and centered by the full spread. */
+@keyframes mobileBookFrameOpenTrueCenter{
+  0%,26%{transform:translate(-75%,-50%) rotateX(7deg) rotateZ(-1deg) scale(.74)}
+  44%{transform:translate(-66%,-50%) rotateX(5deg) rotateZ(-.6deg) scale(.82)}
+  68%{transform:translate(-52%,-50%) rotateX(2deg) rotateZ(0) scale(.98)}
+  76%,100%{transform:translate(-50%,-50%) rotateX(0) rotateZ(0) scale(1)}
+}
+@media(max-width:760px){
+  .bookOpeningStage{
+    inset:0!important;
+    width:100%!important;
+    height:100%!important;
+    padding:0!important;
+    display:block!important;
+    overflow:hidden!important;
+    box-sizing:border-box!important;
+    background:
+      radial-gradient(circle at 16% 18%,color-mix(in srgb,var(--theme-secondary) 13%,transparent),transparent 22%),
+      radial-gradient(circle at 84% 80%,color-mix(in srgb,var(--theme-deco) 14%,transparent),transparent 24%),
+      radial-gradient(circle at 50% 50%,color-mix(in srgb,var(--accent) 8%,transparent),transparent 42%),
+      color-mix(in srgb,var(--book-paper-2) 91%,transparent)!important;
+  }
+  .openingBook{
+    position:absolute!important;
+    left:50%!important;
+    top:50%!important;
+    right:auto!important;
+    bottom:auto!important;
+    width:min(92vw,760px)!important;
+    height:auto!important;
+    min-height:0!important;
+    max-width:none!important;
+    max-height:none!important;
+    aspect-ratio:980 / 650!important;
+    margin:0!important;
+    transform-origin:center center!important;
+    transform:translate(-75%,-50%) rotateX(7deg) rotateZ(-1deg) scale(.74);
+    animation:mobileBookFrameOpenTrueCenter 2.24s cubic-bezier(.2,.78,.18,1) both!important;
+  }
+  .bookOpeningStage::before,
+  .bookOpeningStage::after{
+    position:absolute!important;
+    left:50%!important;
+    width:min(78vw,620px)!important;
+    height:90px!important;
+    padding:0!important;
+    border:0!important;
+    border-radius:0!important;
+    background:
+      radial-gradient(circle at 7% 54%,color-mix(in srgb,var(--theme-secondary) 72%,white) 0 3px,transparent 4px),
+      radial-gradient(circle at 19% 24%,color-mix(in srgb,var(--accent) 54%,white) 0 4px,transparent 5px),
+      radial-gradient(circle at 34% 66%,color-mix(in srgb,var(--theme-deco) 68%,white) 0 2px,transparent 3px),
+      radial-gradient(circle at 67% 30%,color-mix(in srgb,var(--theme-secondary) 62%,white) 0 3px,transparent 4px),
+      radial-gradient(circle at 82% 70%,color-mix(in srgb,var(--accent) 52%,white) 0 4px,transparent 5px),
+      radial-gradient(circle at 94% 36%,color-mix(in srgb,var(--theme-deco) 70%,white) 0 2px,transparent 3px)!important;
+    box-shadow:none!important;
+    backdrop-filter:none!important;
+    -webkit-backdrop-filter:none!important;
+    color:color-mix(in srgb,var(--accent) 56%,var(--theme-secondary) 44%)!important;
+    text-shadow:0 0 16px color-mix(in srgb,var(--accent) 24%,transparent)!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    font-size:20px!important;
+    letter-spacing:.55em!important;
+    white-space:nowrap!important;
+    z-index:96!important;
+    pointer-events:none!important;
+  }
+  .bookOpeningStage::before{
+    content:"✦   ✧   ⋆   ✦"!important;
+    top:10%!important;
+    bottom:auto!important;
+    transform:translateX(-50%)!important;
+    animation:stageStarsTop 2.8s ease-in-out infinite!important;
+  }
+  .bookOpeningStage::after{
+    content:"⋆   ✦   ✧   ⋆"!important;
+    top:auto!important;
+    bottom:10%!important;
+    transform:translateX(-50%)!important;
+    animation:stageStarsBottom 3.1s ease-in-out infinite!important;
+  }
+}
+@media(max-width:420px){
+  .openingBook{width:92vw!important}
+  .bookOpeningStage::before,.bookOpeningStage::after{width:82vw!important;height:72px!important;font-size:17px!important;letter-spacing:.42em!important}
+  .bookOpeningStage::before{top:9%!important}
+  .bookOpeningStage::after{bottom:9%!important}
+}
+@keyframes stageStarsTop{
+  0%,100%{transform:translateX(-50%) translateY(0);opacity:.72}
+  50%{transform:translateX(-50%) translateY(-6px);opacity:1}
+}
+@keyframes stageStarsBottom{
+  0%,100%{transform:translateX(-50%) translateY(0);opacity:.68}
+  50%{transform:translateX(-50%) translateY(6px);opacity:1}
+}
+@media(prefers-reduced-motion:reduce){
+  .bookOpeningStage::before,.bookOpeningStage::after{animation:none!important}
+}
+</style>
+
 </head>
 <body>
 <div class="app">

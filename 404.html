@@ -1866,7 +1866,7 @@ async function shareRpc(name,args){
 }
 function slugOkay(v){return /^[a-z0-9][a-z0-9_-]{1,39}$/.test(String(v||'').trim().toLowerCase())}
 function shareBaseUrl(){return location.protocol==='http:'||location.protocol==='https:'?location.origin:'https://maro1021.github.io'}
-function publicShareUrl(slug){return `${shareBaseUrl()}/${encodeURIComponent(String(slug||'').trim().toLowerCase())}`}
+function publicShareUrl(slug){return `${shareBaseUrl()}/#/${encodeURIComponent(String(slug||'').trim().toLowerCase())}`}
 function ownerMap(){try{return JSON.parse(localStorage.getItem('promptAtlasShareOwnersV1')||'{}')||{}}catch{return{}}}
 function ownerTokenFor(slug,create=false){const m=ownerMap(),k=String(slug||'').toLowerCase();if(m[k])return m[k];if(!create)return'';const bytes=new Uint8Array(24);if(globalThis.crypto?.getRandomValues)crypto.getRandomValues(bytes);else for(let i=0;i<bytes.length;i++)bytes[i]=Math.floor(Math.random()*256);const t=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');m[k]=t;localStorage.setItem('promptAtlasShareOwnersV1',JSON.stringify(m));return t}
 function forgetOwnerToken(slug){const m=ownerMap();delete m[String(slug||'').toLowerCase()];localStorage.setItem('promptAtlasShareOwnersV1',JSON.stringify(m))}

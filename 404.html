@@ -1438,6 +1438,37 @@ body{
 body.public-view .publicBadge{display:inline-flex}body.public-view #settingsBtn,body.public-view #backupBtn,body.public-view #genreManageBtn,body.public-view #addBtn,body.public-view #mobileMoreBtn,body.public-view #shareBtn{display:none!important}body.public-view .cardActions{display:none!important}body.public-view .card{cursor:pointer}body.public-view .genreQuickActions{display:none!important}body.public-view .sortWrap{display:flex}body.public-view .metaRow{margin-top:14px}body.public-view .detailEditBtn{display:none!important}body.public-view .topbar .brand p::after{content:" · Shared View";color:var(--accent);font-weight:800}body.public-view .card{padding-bottom:0!important}.publicLoadState{grid-column:1/-1;padding:28px;border:1px dashed var(--line);border-radius:20px;text-align:center;color:var(--muted);background:var(--panel)}.publicLoadState strong{display:block;color:var(--text);font-size:18px;margin-bottom:8px}.publicOwnerHint{font-size:11px;color:var(--muted);margin-top:8px}.shareSuccess{border-color:color-mix(in srgb,#42a777 40%,var(--line));background:color-mix(in srgb,#42a777 8%,var(--panel))}.shareError{border-color:color-mix(in srgb,#d75a68 45%,var(--line));background:color-mix(in srgb,#d75a68 8%,var(--panel))}
 @media(max-width:760px){.shareGrid{grid-template-columns:1fr}.shareLinkBox{flex-direction:column}.shareSlugWrap{align-items:stretch;flex-direction:column}.shareSlugPrefix{white-space:normal}.publicBadge{padding:6px 8px}}
 
+
+
+/* v1.48 — phone book-opening fit: keep desktop proportions, never crop the book. */
+@keyframes mobileBookFrameOpenFit{
+  0%{transform:translateX(-22%) rotateX(9deg) rotateZ(-1.2deg) scale(.72)}
+  26%{transform:translateX(-22%) rotateX(9deg) rotateZ(-1.2deg) scale(.72)}
+  44%{transform:translateX(-17%) rotateX(7deg) rotateZ(-.7deg) scale(.78)}
+  76%{transform:translateX(-2%) rotateX(3deg) rotateZ(0) scale(.95)}
+  100%{transform:translateX(0) rotateX(0) rotateZ(0) scale(1)}
+}
+@media(max-width:760px){
+  .bookOpeningStage{
+    padding:18px 12px!important;
+    place-items:center!important;
+    overflow:hidden!important;
+  }
+  .openingBook{
+    width:min(66vw,560px)!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    aspect-ratio:980 / 650!important;
+    animation:mobileBookFrameOpenFit 2.24s cubic-bezier(.2,.78,.18,1) both!important;
+    transform:translateX(-22%) rotateX(9deg) rotateZ(-1.2deg) scale(.72)!important;
+    transform-origin:center center!important;
+  }
+}
+@media(max-width:420px){
+  .openingBook{width:68vw!important}
+}
+
 </style>
 
 <style>

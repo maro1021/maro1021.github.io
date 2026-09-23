@@ -2209,8 +2209,8 @@ async function loadPublicShare(){
  try{const data=await shareRpc('pa_share_get',{p_slug:requestedShareSlug.toLowerCase()});const payload=data?.payload??data;if(!payload||!Array.isArray(payload.characters))throw new Error('공개된 도감이 없어요.');state=migrateState(payload);state.genres=(state.genres||[]).map(g=>({...g,viewLocked:false,viewPasswordHash:''}));return true}catch(e){publicError(String(e?.message||'공개된 도감을 찾지 못했어요.'));return false}
 }
 let state;
-try{state=migrateState(JSON.parse(localStorage.getItem('promptAtlasSharedStateV3'))||JSON.parse(document.getElementById('promptAtlasSeed').textContent)||defaultState())}catch{state=defaultState()}
-if(!localStorage.getItem('promptAtlasSharedStateV3')){state.settings.siteTitle='';state.settings.siteLogo=''}
+try{state=migrateState(JSON.parse(localStorage.getItem('promptAtlasSharedStateV4CleanShare'))||JSON.parse(document.getElementById('promptAtlasSeed').textContent)||defaultState())}catch{state=defaultState()}
+if(!localStorage.getItem('promptAtlasSharedStateV4CleanShare')){state.characters=[];state.logs=[];state.settings.siteTitle='';state.settings.siteLogo=''}
 let search='';let editDraft=null;let activeDetail=null;let activeDetailChapter=null;let activePhotoIndex=0;let imagePasteTarget='card';let activeGenreLockControl=null;
 const sessionViewUnlocks=new Set();
 const sessionPrivateUnlocks=new Set();
@@ -2245,7 +2245,7 @@ function renderGenreLockControl(){if(!activeGenreLockControl)return;const {i,typ
 }
 
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-function save(){if(publicMode)return;try{localStorage.setItem('promptAtlasSharedStateV3',JSON.stringify(state));document.dispatchEvent(new Event('prompt-atlas-state-changed'))}catch(e){toast('저장 공간이 부족할 수 있어요. 큰 이미지는 백업 후 줄여주세요.')} }
+function save(){if(publicMode)return;try{localStorage.setItem('promptAtlasSharedStateV4CleanShare',JSON.stringify(state));document.dispatchEvent(new Event('prompt-atlas-state-changed'))}catch(e){toast('저장 공간이 부족할 수 있어요. 큰 이미지는 백업 후 줄여주세요.')} }
 window.PromptAtlasBridge={getState:()=>state,save:()=>save(),isPublic:()=>publicMode,openCharacterDetail:id=>openDetail(id)};
 function toast(msg){const el=$('#toast');el.textContent=msg;el.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),1800)}
 function genreColor(name){return state.genres.find(g=>g.name===name)?.color||'#737b8f'}

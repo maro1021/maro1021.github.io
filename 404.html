@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <title>Prompt Atlas — Character Prompt Archive</title>
-<script>if(String(location.hash||'').startsWith('#/'))document.documentElement.classList.add('public-booting')</script>
+<script>(()=>{let shared=false;try{const hash=String(location.hash||'');const path=decodeURIComponent(location.pathname||'/').replace(/^\/+|\/+$/g,'');shared=hash.startsWith('#/')&&!!hash.slice(2).split(/[?#]/)[0]||location.protocol!=='file:'&&!!path&&!['index.html','404.html'].includes(path)}catch{}if(shared)document.documentElement.classList.add('public-booting');else if(location.protocol!=='file:'&&new URLSearchParams(location.search).get('edit')!=='1')document.documentElement.classList.add('base-landing')})()</script>
 <style>
 :root{
   --bg:#f4f6fb;--panel:#ffffff;--panel2:#f8f9fd;--text:#1d2433;--muted:#737b8f;--line:#e6e9f1;
@@ -18,6 +18,7 @@ html[data-theme="dark"]{
 }
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;min-height:100vh}
 #publicBootScreen{display:none}html.public-booting .app{visibility:hidden}html.public-booting #publicBootScreen{position:fixed;inset:0;z-index:100000;display:grid;place-items:center;background:var(--bg);color:var(--text)}.publicBootCard{display:grid;justify-items:center;gap:13px;padding:26px 32px;border:1px solid var(--line);border-radius:24px;background:var(--panel);box-shadow:var(--shadow);font-size:13px;font-weight:850}.publicBootSpinner{width:38px;height:38px;border:4px solid var(--accent-soft,#e8e5ff);border-top-color:var(--accent);border-radius:50%;animation:publicBootSpin .8s linear infinite}@keyframes publicBootSpin{to{transform:rotate(360deg)}}
+html.base-landing .app,html.base-landing .overlay,html.base-landing #publicBootScreen,html.base-landing .toast{display:none!important}.baseLanding{display:none}html.base-landing .baseLanding{min-height:100vh;display:grid;place-items:center;padding:24px}.baseLandingCard{max-width:440px;width:100%;text-align:center;background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:46px 28px;box-shadow:var(--shadow)}.baseLandingCard span{display:inline-grid;place-items:center;width:54px;height:54px;border-radius:18px;background:var(--chip1);color:var(--accent);font-size:28px}.baseLandingCard h1{font-size:22px;margin:22px 0 10px}.baseLandingCard p{color:var(--muted);line-height:1.7;margin:0}
 button,input,textarea,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}
 .app{max-width:1520px;margin:0 auto;padding:20px 20px 80px}.topbar{display:flex;gap:14px;align-items:center;justify-content:space-between;margin-bottom:18px;position:sticky;top:0;z-index:20;padding:12px 0;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(16px)}
 .brand{display:flex;align-items:center;gap:11px;min-width:250px}.brandMark{width:42px;height:42px;border-radius:14px;background:linear-gradient(145deg,var(--accent),#7fd0ff);display:grid;place-items:center;color:white;font-weight:900;box-shadow:0 8px 24px rgba(103,98,232,.28)}.brand h1{font-size:18px;margin:0}.brand p{font-size:12px;color:var(--muted);margin:2px 0 0}
@@ -1881,6 +1882,7 @@ body.public-view .publicBadge{display:inline-flex}body.public-view #settingsBtn,
 </style>
 </head>
 <body>
+<main class="baseLanding"><div class="baseLandingCard"><span aria-hidden="true">✦</span><h1>공유 주소로 방문해 주세요</h1><p>전달받은 주소를 열면 해당 도감을 볼 수 있어요.</p></div></main>
 <div id="publicBootScreen" role="status" aria-live="polite"><div class="publicBootCard"><span class="publicBootSpinner"></span><span>공유본을 불러오는 중이에요…</span></div></div>
 <div class="app">
   <header class="topbar">
@@ -2245,6 +2247,44 @@ function publicSnapshot(){
  return{version:15,genres:allowedGenres,attributes:deepClone(state.attributes||[]),globalTags:deepClone(state.globalTags||[]),characters:chars,logs,sitePages,settings};
 }
 const SHARE_PACK_FORMAT='prompt-atlas-gzip-v1';
+const SHARE_CHUNK_FORMAT='prompt-atlas-chunks-v1',SHARE_PART_FORMAT='prompt-atlas-part-v1',SHARE_CHUNK_SIZE=350000;
+function sharePayloadOf(result){return result?.payload??result}
+function shareChunkHash(value){let h=2166136261>>>0;for(let i=0;i<value.length;i++)h=Math.imul(h^value.charCodeAt(i),16777619)>>>0;return h.toString(16)}
+async function shareLimited(items,count,worker){let next=0,failure=null;await Promise.all(Array.from({length:Math.min(count,items.length)},async()=>{while(next<items.length&&!failure){const index=next++;try{await worker(items[index],index)}catch(e){failure=e}}}));if(failure)throw failure}
+function shareChunkDescriptors(packed,revision){
+ const encoded=packed.compressed?packed.value.data:JSON.stringify(packed.value);
+ if(encoded.length<=SHARE_CHUNK_SIZE)return null;
+ const prefix=`pa${revision.replace(/[^a-z0-9]/g,'').slice(-22)}`;
+ return{encoded,parts:Array.from({length:Math.ceil(encoded.length/SHARE_CHUNK_SIZE)},(_,i)=>{const data=encoded.slice(i*SHARE_CHUNK_SIZE,(i+1)*SHARE_CHUNK_SIZE);return{slug:`${prefix}${i.toString(36).padStart(4,'0')}`,length:data.length,hash:shareChunkHash(data),data}})};
+}
+async function publishSharePart(part,index,revision,token){
+ const payload={__paFormat:SHARE_PART_FORMAT,__paRevision:revision,index,data:part.data};
+ for(let attempt=0;attempt<2;attempt++){
+  try{await shareRpc('pa_share_publish',{p_slug:part.slug,p_payload:payload,p_token:token});return}
+  catch(e){try{const saved=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:part.slug}));if(saved?.__paRevision===revision&&saved.index===index&&saved.data.length===part.length&&shareChunkHash(saved.data)===part.hash)return}catch{}
+   if(attempt||!(!e.status||e.status>=500||/timeout|57014/i.test(String(e.message))))throw e}
+ }
+}
+async function unpackChunkedShare(manifest){
+ const descriptors=manifest.chunks;
+ if(!Array.isArray(descriptors)||!descriptors.length||descriptors.length>2000||!Number.isSafeInteger(manifest.totalLength)||manifest.totalLength>350000000||!['gzip-base64','json'].includes(manifest.encoding))throw new Error('공유본의 저장 정보가 올바르지 않아요.');
+ const parts=new Array(descriptors.length);let done=0;
+ const progress=document.querySelector('#publicBootScreen .publicBootCard span:last-child');
+ await shareLimited(descriptors,4,async(d,index)=>{
+  if(!slugOkay(d?.slug)||!Number.isSafeInteger(d.length)||d.length<1||d.length>SHARE_CHUNK_SIZE||typeof d.hash!=='string')throw new Error('공유본 조각 정보가 손상됐어요.');
+  const chunk=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:d.slug}));
+  if(chunk?.__paFormat!==SHARE_PART_FORMAT||chunk.__paRevision!==manifest.__paRevision||chunk.index!==index||typeof chunk.data!=='string'||chunk.data.length!==d.length||shareChunkHash(chunk.data)!==d.hash)throw new Error('공유본을 완전히 읽지 못했어요. 잠시 후 다시 열어 주세요.');
+  parts[index]=chunk.data;done++;if(progress)progress.textContent=`공유본을 불러오는 중이에요… ${done}/${descriptors.length}`;
+ });
+ const encoded=parts.join('');if(encoded.length!==manifest.totalLength)throw new Error('공유본 크기가 일치하지 않아요.');
+ const payload=manifest.encoding==='gzip-base64'?{__paFormat:SHARE_PACK_FORMAT,__paRevision:manifest.__paRevision,data:encoded}:JSON.parse(encoded);
+ return unpackSharePayload(payload);
+}
+const SHARE_CLEANUP_KEY='promptAtlasShareChunkCleanupV1';
+function shareCleanupQueue(){try{return JSON.parse(localStorage.getItem(SHARE_CLEANUP_KEY)||'[]')||[]}catch{return[]}}
+function scheduleShareCleanup(rootSlug,token,manifest,delay=120000){if(manifest?.__paFormat!==SHARE_CHUNK_FORMAT||!Array.isArray(manifest.chunks))return;const queue=shareCleanupQueue();queue.push({rootSlug,token,slugs:manifest.chunks.map(c=>c.slug),due:Date.now()+delay});localStorage.setItem(SHARE_CLEANUP_KEY,JSON.stringify(queue));setTimeout(()=>{void flushShareCleanup()},delay+1000)}
+let shareCleanupRunning=false;
+async function flushShareCleanup(){if(shareCleanupRunning||!shareConfigured())return;shareCleanupRunning=true;try{const queue=shareCleanupQueue(),keep=[];for(const item of queue){if(item.due>Date.now()){keep.push(item);continue}const failed=[];await shareLimited(item.slugs||[],2,async slug=>{try{await shareRpc('pa_share_delete',{p_slug:slug,p_token:item.token})}catch{failed.push(slug)}});if(failed.length)keep.push({...item,slugs:failed,due:Date.now()+60000})}localStorage.setItem(SHARE_CLEANUP_KEY,JSON.stringify(keep))}finally{shareCleanupRunning=false}}
 function bytesToBase64(bytes){let out='';for(let i=0;i<bytes.length;i+=32768)out+=String.fromCharCode(...bytes.subarray(i,i+32768));return btoa(out)}
 function base64ToBytes(encoded){const raw=atob(encoded),bytes=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);return bytes}
 async function packSharePayload(payload,revision){
@@ -2256,6 +2296,7 @@ async function packSharePayload(payload,revision){
  return packedBytes<originalBytes.length?{value:packed,originalBytes:originalBytes.length,packedBytes,compressed:true}:{value:{...payload,__paRevision:revision},originalBytes:originalBytes.length,packedBytes:originalBytes.length,compressed:false};
 }
 async function unpackSharePayload(payload){
+ if(payload?.__paFormat===SHARE_CHUNK_FORMAT)return unpackChunkedShare(payload);
  if(payload?.__paFormat!==SHARE_PACK_FORMAT)return payload;
  if(typeof DecompressionStream!=='function')throw new Error('압축된 공유본을 열 수 없는 브라우저예요. 브라우저를 업데이트해 주세요.');
  const bytes=base64ToBytes(String(payload.data||''));
@@ -3003,6 +3044,7 @@ function paBindCursorSettings(){
 
 function renderShare(){
  const local=shareConfigFromSettings();const cfg=shareConfigured()?shareBackendConfig:local;const slug=String(state.settings.lastShareSlug||'').toLowerCase();const hasToken=slug&&!!ownerTokenFor(slug,false);
+ void flushShareCleanup();
  const host=shareBaseUrl();
  $('#shareBody').innerHTML=`<div class="shareGrid"><section class="panel"><div class="panelHead"><div><h3>🔗 내 도감 공개</h3><span class="hint">원하는 주소 이름을 정하면 다른 사람이 읽기 전용으로 볼 수 있는 링크를 만들어요.</span></div></div><div class="shareSlugWrap"><span class="shareSlugPrefix">${esc(host)}/</span><input class="input" id="shareSlugInput" maxlength="40" value="${esc(slug)}" placeholder="mama"></div><div class="shareOptionList"><label class="shareOption"><input type="checkbox" id="sharePromptsOpt" ${state.settings.sharePrompts!==false?'checked':''}><span><strong>프롬프트 공개</strong><br>끄면 캐릭터 정보만 보이고 프롬프트 챕터는 공개하지 않아요.</span></label><label class="shareOption"><input type="checkbox" id="shareAlbumOpt" ${state.settings.shareAlbum!==false?'checked':''}><span><strong>앨범 공개</strong><br>끄면 참고 이미지 앨범은 공유본에서 제외돼요.</span></label></div><p class="shareTiny">🔒 보기 잠금된 장르는 공유본에서 제외됩니다. 개별 잠금 캐릭터와 잠금 로그는 공유본에서도 비밀번호로 열 수 있어요. 비밀번호 원문 대신 확인용 암호화값만 사용됩니다.</p><div class="shareServerActions"><button class="btn primary" id="publishShareBtn" type="button">${hasToken?'공유본 업데이트':'공개하기'}</button><button class="btn danger" id="deleteShareBtn" type="button" ${hasToken?'':'disabled'}>공유 해제</button></div><div id="sharePublishStatus" class="shareStatus" style="margin-top:12px"><strong>${shareConfigured()?'공유 서버 연결됨':'공유 서버 연결 필요'}</strong><span>${shareConfigured()?'주소를 정하고 공개하기를 누르면 됩니다.':'공유 서버 연결 상태를 확인해 주세요.'}</span></div>${slug?`<div class="shareLinkBox" style="margin-top:12px"><input class="input" id="shareLinkOutput" readonly value="${esc(publicShareUrl(slug))}"><button class="btn" id="copyShareLinkBtn" type="button">링크 복사</button><button class="btn" id="openShareLinkBtn" type="button">열기</button></div>`:''}</section><section class="panel"><div class="panelHead"><div><h3>☁ 공유 서버 연결</h3><span class="hint">GitHub Pages는 방문자가 만든 데이터를 저장할 수 없어서, 공개본 저장용 Supabase 연결이 한 번 필요해요.</span></div></div><div class="shareServerGrid"><label><span>Supabase Project URL</span><input class="input" id="shareSupabaseUrl" value="${esc(cfg.url||'')}" placeholder="https://xxxx.supabase.co"></label><label><span>Supabase anon / publishable key</span><textarea class="textarea" id="shareSupabaseKey" rows="3" placeholder="eyJ...">${esc(cfg.key||'')}</textarea></label></div><div class="shareServerActions"><button class="btn" id="saveShareServerBtn" type="button">이 브라우저에 저장</button><button class="btn" id="testShareServerBtn" type="button">연결 확인</button><button class="btn" id="downloadShareConfigBtn" type="button">share-config.json 받기</button></div><p class="shareTiny">친구들이 <b>/${esc(slug||'mama')}</b> 같은 링크를 열 수 있으려면, 여기서 받은 <b>share-config.json</b>도 GitHub 저장소의 index.html과 같은 위치에 한 번 업로드해야 해요. anon/publishable key는 브라우저용 공개 키이며, 서비스 롤 키는 절대 넣지 마세요.</p></section></div>`;
  const status=$('#sharePublishStatus');const setStatus=(title,msg,kind='')=>{status.className=`shareStatus ${kind}`;status.innerHTML=`<strong>${esc(title)}</strong><span>${esc(msg)}</span>`};
@@ -3018,26 +3060,35 @@ function renderShare(){
   const slug=String(slugInput.value||'').trim().toLowerCase();
   if(!slugOkay(slug)){setStatus('주소 이름을 확인해 주세요','2~40자의 영문 소문자·숫자·-·_만 사용할 수 있어요.','shareError');return}
   if(!shareConfigured()){setStatus('공유 서버 연결이 필요해요','공유 서버 연결 상태를 확인해 주세요.','shareError');return}
-  button.disabled=true;const token=ownerTokenFor(slug,true),revision=uid('publish');let packed;
+  button.disabled=true;const token=ownerTokenFor(slug,true),revision=uid('publish');let packed,previousManifest=null,manifestAttempted=false,attemptedParts=[];
   const verify=async()=>{try{const result=await shareRpc('pa_share_get',{p_slug:slug});return(result?.payload??result)?.__paRevision===revision}catch{return false}};
-  const finish=()=>{state.settings.lastShareSlug=slug;save();renderShare();const fresh=$('#sharePublishStatus');fresh.className='shareStatus shareSuccess';fresh.innerHTML=`<strong>공개 완료 ✨</strong><span>${esc(publicShareUrl(slug))}</span>`;toast('공유본 업데이트를 확인했어요')};
+  const finish=()=>{if(previousManifest)scheduleShareCleanup(slug,token,previousManifest);state.settings.lastShareSlug=slug;save();renderShare();const fresh=$('#sharePublishStatus');fresh.className='shareStatus shareSuccess';fresh.innerHTML=`<strong>공개 완료 ✨</strong><span>${esc(publicShareUrl(slug))}</span>`;toast('공유본 업데이트를 확인했어요')};
   try{
    setStatus('공유본 준비 중…','이미지 품질을 바꾸지 않고 전송 데이터만 압축하고 있어요.');packed=await packSharePayload(publicSnapshot(),revision);
-   const size=(packed.packedBytes/1024/1024).toFixed(1),before=(packed.originalBytes/1024/1024).toFixed(1);
-   if(packed.packedBytes>8*1024*1024&&!confirm(`전송 크기 ${size}MB(원본 데이터 ${before}MB)예요. 서버의 용량·시간 제한으로 실패할 수 있어요. 계속할까요?`))return;
-   setStatus('공개 중…',`전송 크기 ${size}MB · 서버에 저장한 뒤 다시 읽어 확인할게요.`);
-   await shareRpc('pa_share_publish',{p_slug:slug,p_payload:packed.value,p_token:token});
+   const size=(packed.packedBytes/1024/1024).toFixed(1),chunkPlan=shareChunkDescriptors(packed,revision);
+   if(chunkPlan){
+    try{previousManifest=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:slug}))}catch{}
+    let done=0;setStatus('공유본 전송 중…',`${size}MB를 ${chunkPlan.parts.length}개로 나눠 저장해요. 이 창을 닫지 말아 주세요. (0/${chunkPlan.parts.length})`);
+    await shareLimited(chunkPlan.parts,3,async(part,index)=>{attemptedParts.push(part);await publishSharePart(part,index,revision,token);done++;setStatus('공유본 전송 중…',`${size}MB · 저장 완료 ${done}/${chunkPlan.parts.length}. 이 창을 닫지 말아 주세요.`)});
+    const manifest={__paFormat:SHARE_CHUNK_FORMAT,__paRevision:revision,encoding:packed.compressed?'gzip-base64':'json',totalLength:chunkPlan.encoded.length,chunks:chunkPlan.parts.map(({slug,length,hash})=>({slug,length,hash}))};
+    setStatus('업데이트 확인 중…','모든 조각을 저장했어요. 이제 공개 주소를 새 버전으로 바꿔 확인해요.');manifestAttempted=true;
+    await shareRpc('pa_share_publish',{p_slug:slug,p_payload:manifest,p_token:token});
+   }else{
+    setStatus('공개 중…',`전송 크기 ${size}MB · 저장한 뒤 다시 읽어 확인할게요.`);manifestAttempted=true;
+    await shareRpc('pa_share_publish',{p_slug:slug,p_payload:packed.value,p_token:token});
+   }
    if(await verify())finish();else setStatus('업데이트 확인 필요','서버 응답은 받았지만 새 공유본을 다시 읽어 확인하지 못했어요. 잠시 후 공유 링크를 확인해 주세요.','shareError');
   }catch(e){
    if(await verify()){finish();return}
+   if(attemptedParts.length&&!manifestAttempted)scheduleShareCleanup(slug,token,{__paFormat:SHARE_CHUNK_FORMAT,chunks:attemptedParts},1000);
    const m=String(e?.message||'');
    if(/slug_taken|already|owner|token/i.test(m)){setStatus('주소 권한을 확인해 주세요','이미 사용 중인 주소이거나 이 브라우저에 해당 주소의 공유 권한이 없어요. 기존 공유본은 그대로예요.','shareError')}
-   else if(/statement timeout|timeout|57014/i.test(m)){setStatus('서버 시간 제한으로 업데이트 실패',`기존 공유본은 유지됐어요. ${packed?`압축 전송 크기 ${(packed.packedBytes/1024/1024).toFixed(1)}MB. `:''}이미지가 많으면 공유 서버의 저장 제한을 조정하거나 이미지 저장 방식을 분리해야 해요. ${m}`,'shareError')}
+   else if(/statement timeout|timeout|57014/i.test(m)){setStatus('서버 시간 제한으로 업데이트 실패',`이전 공유본은 유지됐어요. ${packed?`전체 전송 크기 ${(packed.packedBytes/1024/1024).toFixed(1)}MB. `:''}조각 저장 중 시간 제한이 걸렸어요. ${m}`,'shareError')}
    else setStatus('공개하지 못했어요',m||'공유 서버 설정을 확인해 주세요.','shareError');
   }finally{if(button.isConnected)button.disabled=false}
  };
  const copy=$('#copyShareLinkBtn');if(copy)copy.onclick=()=>copyText($('#shareLinkOutput').value,'공유 링크를 복사했어요');const open=$('#openShareLinkBtn');if(open)open.onclick=()=>window.open($('#shareLinkOutput').value,'_blank','noopener');
- const del=$('#deleteShareBtn');if(del)del.onclick=async()=>{const slug=String(state.settings.lastShareSlug||'').toLowerCase(),token=ownerTokenFor(slug,false);if(!slug||!token)return;if(!confirm(`/${slug} 공개본을 삭제할까요?`))return;try{await shareRpc('pa_share_delete',{p_slug:slug,p_token:token});forgetOwnerToken(slug);state.settings.lastShareSlug='';save();renderShare();toast('공유본을 삭제했어요')}catch(e){setStatus('공유 해제 실패',String(e?.message||'서버 설정을 확인해 주세요.'),'shareError')}};
+ const del=$('#deleteShareBtn');if(del)del.onclick=async()=>{const slug=String(state.settings.lastShareSlug||'').toLowerCase(),token=ownerTokenFor(slug,false);if(!slug||!token)return;if(!confirm(`/${slug} 공개본을 삭제할까요?`))return;try{let manifest=null;try{manifest=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:slug}))}catch{}await shareRpc('pa_share_delete',{p_slug:slug,p_token:token});if(manifest)scheduleShareCleanup(slug,token,manifest,1000);forgetOwnerToken(slug);state.settings.lastShareSlug='';save();renderShare();toast('공유본을 삭제했어요')}catch(e){setStatus('공유 해제 실패',String(e?.message||'서버 설정을 확인해 주세요.'),'shareError')}};
 }
 
 function renderFilterModal(){$('#filterBody').innerHTML=`<div class="panel"><h3>빠른 필터</h3><label class="checkRow"><input type="checkbox" id="fAdded" ${state.settings.recentAdded?'checked':''}> 최근 7일 추가</label><label class="checkRow"><input type="checkbox" id="fUpdated" ${state.settings.recentUpdated?'checked':''}> 최근 7일 수정</label></div><div class="panel"><div class="inline"><button class="btn" id="openManagerFromFilter">장르 · 분류 · 속성 관리</button><button class="btn" id="openBackupFromFilter">백업 · 복원</button></div></div>`;$('#fAdded').onchange=e=>{state.settings.recentAdded=e.target.checked;save();renderAll()};$('#fUpdated').onchange=e=>{state.settings.recentUpdated=e.target.checked;save();renderAll()};$('#openManagerFromFilter').onclick=()=>{closeOverlay('filterOverlay');renderManager();openOverlay('managerOverlay')};$('#openBackupFromFilter').onclick=()=>{closeOverlay('filterOverlay');renderBackup();openOverlay('backupOverlay')}}
@@ -3098,17 +3149,19 @@ function launchSiteOpeningEffect(){
 async function bootApp(){
   setPublicUi();
   try{
+    if(document.documentElement.classList.contains('base-landing'))return;
     if(publicMode){
       const ok=await loadPublicShare();
       if(ok){renderAll();sanitizeStoredMedia();}
     }else{
       if(!localStorage.getItem(STATE_KEY))try{const stored=await readStateDb();if(stored?.json)state=migrateState(JSON.parse(stored.json))}catch(e){/* Older browsers continue from localStorage. */}
       await loadShareConfig();
+      const pendingCleanup=shareCleanupQueue();if(pendingCleanup.length){void flushShareCleanup();const due=Math.min(...pendingCleanup.map(item=>item.due||Date.now()));if(due>Date.now())setTimeout(()=>{void flushShareCleanup()},due-Date.now()+1000)}
       renderAll();sanitizeStoredMedia();
     }
   }finally{
     document.documentElement.classList.remove('public-booting');
-    setTimeout(launchSiteOpeningEffect,40);
+    if(!document.documentElement.classList.contains('base-landing'))setTimeout(launchSiteOpeningEffect,40);
     window.promptAtlasReady=true;document.dispatchEvent(new Event('prompt-atlas-ready'));
   }
 }

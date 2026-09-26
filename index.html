@@ -17,7 +17,7 @@ html[data-theme="dark"]{
   --chip1:#252c52;--chip2:#173d35;--chip3:#4b3022;--chip4:#3a2548;--chip5:#1f3850;
 }
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;min-height:100vh}
-#publicBootScreen{display:none}html.public-booting .app{visibility:hidden}html.public-booting #publicBootScreen{position:fixed;inset:0;z-index:100000;display:grid;place-items:center;background:var(--bg);color:var(--text)}.publicBootCard{display:grid;justify-items:center;gap:13px;padding:26px 32px;border:1px solid var(--line);border-radius:24px;background:var(--panel);box-shadow:var(--shadow);font-size:13px;font-weight:850}.publicBootSpinner{width:38px;height:38px;border:4px solid var(--accent-soft,#e8e5ff);border-top-color:var(--accent);border-radius:50%;animation:publicBootSpin .8s linear infinite}@keyframes publicBootSpin{to{transform:rotate(360deg)}}
+#publicBootScreen{display:none}html.public-booting .app{visibility:hidden}html.public-booting #publicBootScreen{position:fixed;inset:0;z-index:100000;display:grid;place-items:center;background:var(--bg);color:var(--text);opacity:0;animation:publicBootReveal .15s ease .55s forwards}@keyframes publicBootReveal{to{opacity:1}}.publicBootCard{display:grid;justify-items:center;gap:13px;padding:26px 32px;border:1px solid var(--line);border-radius:24px;background:var(--panel);box-shadow:var(--shadow);font-size:13px;font-weight:850}.publicBootSpinner{width:38px;height:38px;border:4px solid var(--accent-soft,#e8e5ff);border-top-color:var(--accent);border-radius:50%;animation:publicBootSpin .8s linear infinite}@keyframes publicBootSpin{to{transform:rotate(360deg)}}
 html.base-landing .app,html.base-landing .overlay,html.base-landing #publicBootScreen,html.base-landing .toast{display:none!important}.baseLanding{display:none}html.base-landing .baseLanding{min-height:100vh;display:grid;place-items:center;padding:24px}.baseLandingCard{max-width:440px;width:100%;text-align:center;background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:46px 28px;box-shadow:var(--shadow)}.baseLandingCard span{display:inline-grid;place-items:center;width:54px;height:54px;border-radius:18px;background:var(--chip1);color:var(--accent);font-size:28px}.baseLandingCard h1{font-size:22px;margin:22px 0 10px}.baseLandingCard p{color:var(--muted);line-height:1.7;margin:0}
 button,input,textarea,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}
 .app{max-width:1520px;margin:0 auto;padding:20px 20px 80px}.topbar{display:flex;gap:14px;align-items:center;justify-content:space-between;margin-bottom:18px;position:sticky;top:0;z-index:20;padding:12px 0;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(16px)}
@@ -2248,6 +2248,16 @@ function publicSnapshot(){
 }
 const SHARE_PACK_FORMAT='prompt-atlas-gzip-v1';
 const SHARE_CHUNK_FORMAT='prompt-atlas-chunks-v1',SHARE_PART_FORMAT='prompt-atlas-part-v1',SHARE_CHUNK_SIZE=350000;
+let publicCacheDbPromise=null;
+function publicCacheKey(slug){return `${normalizeSupabaseUrl(shareBackendConfig.url)}|${String(slug||'').toLowerCase()}`}
+function openPublicCacheDb(){
+ if(!('indexedDB' in window))return Promise.reject(new Error('public_cache_unavailable'));
+ if(!publicCacheDbPromise)publicCacheDbPromise=new Promise((resolve,reject)=>{const req=indexedDB.open('PromptAtlasPublicCacheV1',1);req.onupgradeneeded=()=>req.result.createObjectStore('shares');req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error||new Error('public_cache_open_failed'))}).catch(e=>{publicCacheDbPromise=null;throw e});
+ return publicCacheDbPromise;
+}
+async function readPublicShareCache(slug){const db=await openPublicCacheDb();return new Promise((resolve,reject)=>{const req=db.transaction('shares','readonly').objectStore('shares').get(publicCacheKey(slug));req.onsuccess=()=>resolve(req.result?.packed?.__paRevision?req.result:null);req.onerror=()=>reject(req.error)})}
+async function writePublicShareCache(slug,packed){if(!packed?.__paRevision||packed.__paFormat===SHARE_CHUNK_FORMAT)return;const db=await openPublicCacheDb();return new Promise((resolve,reject)=>{const tx=db.transaction('shares','readwrite');tx.objectStore('shares').put({packed,savedAt:Date.now()},publicCacheKey(slug));tx.oncomplete=()=>resolve(true);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)})}
+async function deletePublicShareCache(slug){const db=await openPublicCacheDb();return new Promise((resolve,reject)=>{const tx=db.transaction('shares','readwrite');tx.objectStore('shares').delete(publicCacheKey(slug));tx.oncomplete=()=>resolve(true);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)})}
 function sharePayloadOf(result){return result?.payload??result}
 function shareChunkHash(value){let h=2166136261>>>0;for(let i=0;i<value.length;i++)h=Math.imul(h^value.charCodeAt(i),16777619)>>>0;return h.toString(16)}
 async function shareLimited(items,count,worker){let next=0,failure=null;await Promise.all(Array.from({length:Math.min(count,items.length)},async()=>{while(next<items.length&&!failure){const index=next++;try{await worker(items[index],index)}catch(e){failure=e}}}));if(failure)throw failure}
@@ -2265,20 +2275,19 @@ async function publishSharePart(part,index,revision,token){
    if(attempt||!(!e.status||e.status>=500||/timeout|57014/i.test(String(e.message))))throw e}
  }
 }
-async function unpackChunkedShare(manifest){
+async function unpackChunkedShare(manifest,capturePacked){
  const descriptors=manifest.chunks;
  if(!Array.isArray(descriptors)||!descriptors.length||descriptors.length>2000||!Number.isSafeInteger(manifest.totalLength)||manifest.totalLength>350000000||!['gzip-base64','json'].includes(manifest.encoding))throw new Error('공유본의 저장 정보가 올바르지 않아요.');
- const parts=new Array(descriptors.length);let done=0;
- const progress=document.querySelector('#publicBootScreen .publicBootCard span:last-child');
- await shareLimited(descriptors,4,async(d,index)=>{
+ const parts=new Array(descriptors.length);
+ await shareLimited(descriptors,8,async(d,index)=>{
   if(!slugOkay(d?.slug)||!Number.isSafeInteger(d.length)||d.length<1||d.length>SHARE_CHUNK_SIZE||typeof d.hash!=='string')throw new Error('공유본 조각 정보가 손상됐어요.');
   const chunk=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:d.slug}));
   if(chunk?.__paFormat!==SHARE_PART_FORMAT||chunk.__paRevision!==manifest.__paRevision||chunk.index!==index||typeof chunk.data!=='string'||chunk.data.length!==d.length||shareChunkHash(chunk.data)!==d.hash)throw new Error('공유본을 완전히 읽지 못했어요. 잠시 후 다시 열어 주세요.');
-  parts[index]=chunk.data;done++;if(progress)progress.textContent=`공유본을 불러오는 중이에요… ${done}/${descriptors.length}`;
+  parts[index]=chunk.data;
  });
  const encoded=parts.join('');if(encoded.length!==manifest.totalLength)throw new Error('공유본 크기가 일치하지 않아요.');
  const payload=manifest.encoding==='gzip-base64'?{__paFormat:SHARE_PACK_FORMAT,__paRevision:manifest.__paRevision,data:encoded}:JSON.parse(encoded);
- return unpackSharePayload(payload);
+ const snapshot=await unpackSharePayload(payload);if(typeof capturePacked==='function')capturePacked(payload);return snapshot;
 }
 const SHARE_CLEANUP_KEY='promptAtlasShareChunkCleanupV1';
 function shareCleanupQueue(){try{return JSON.parse(localStorage.getItem(SHARE_CLEANUP_KEY)||'[]')||[]}catch{return[]}}
@@ -2295,8 +2304,30 @@ async function packSharePayload(payload,revision){
  const packedBytes=new Blob([JSON.stringify(packed)]).size;
  return packedBytes<originalBytes.length?{value:packed,originalBytes:originalBytes.length,packedBytes,compressed:true}:{value:{...payload,__paRevision:revision},originalBytes:originalBytes.length,packedBytes:originalBytes.length,compressed:false};
 }
-async function unpackSharePayload(payload){
- if(payload?.__paFormat===SHARE_CHUNK_FORMAT)return unpackChunkedShare(payload);
+async function sharePreviewImage(source,maxSide=280){
+ const src=String(source||'');if(!src)return'';
+ if(!src.startsWith('data:image/'))return src.length<2000?src:'';
+ return new Promise(resolve=>{
+  const img=new Image();let settled=false;
+  const done=value=>{if(settled)return;settled=true;clearTimeout(timer);resolve(value)};
+  const timer=setTimeout(()=>done(''),5000);
+  img.onload=()=>{try{const scale=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight)),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);const small=canvas.toDataURL('image/webp',.72);done(small.length<26000?small:'')}catch{done('')}};
+  img.onerror=()=>done('');img.src=src;
+ });
+}
+async function makePublicPreview(snapshot){
+ const main=snapshot.sitePages?.main||{};
+ const preview={version:snapshot.version,genres:snapshot.genres,attributes:snapshot.attributes,globalTags:[],settings:{...snapshot.settings,siteLogo:''},sitePages:{main:{...main,portraitImage:'',portraitImageOriginal:'',intro:String(main.intro||'').slice(0,3000),guideItems:(main.guideItems||[]).slice(0,20).map(item=>String(item).slice(0,350))}},characters:(snapshot.characters||[]).map(ch=>({id:ch.id,name:ch.name,genre:ch.genre,description:String(ch.description||'').slice(0,500),descriptionHtml:'',partner:ch.partner,gender:ch.gender,height:ch.height,age:ch.age,classifications:ch.classifications,attributes:ch.attributes,tags:ch.tags,privateLocked:ch.privateLocked,privatePasswordHash:ch.privatePasswordHash,featuredRole:ch.featuredRole,anniversaryEnabled:ch.anniversaryEnabled,anniversaryDate:ch.anniversaryDate,anniversaryStartAtOne:ch.anniversaryStartAtOne,order:ch.order,createdAt:ch.createdAt,updatedAt:ch.updatedAt,cardImage:'',detailImage:'',refs:[],chapters:[],youtubeLinks:[]})),logs:(snapshot.logs||[]).map(log=>({id:log.id,character:log.character,date:log.date,title:log.title,tags:log.tags,locked:log.locked,passwordHash:log.passwordHash,text:log.locked?'':String(log.text||'').slice(0,300),input:''}))};
+ let size=JSON.stringify(preview).length,limit=270000;
+ const addImage=async(target,key,source,maxSide)=>{if(size>=limit)return;const image=await sharePreviewImage(source,maxSide);if(image&&size+image.length<limit){target[key]=image;size+=image.length}};
+ await addImage(preview.settings,'siteLogo',snapshot.settings?.siteLogo,96);
+ await addImage(preview.sitePages.main,'portraitImage',main.portraitImage,280);
+ const priority=preview.characters.map((_,i)=>i).sort((a,b)=>Number(snapshot.characters[b].featuredRole==='main')-Number(snapshot.characters[a].featuredRole==='main')||Number(snapshot.characters[b].featuredRole==='sub')-Number(snapshot.characters[a].featuredRole==='sub')||a-b);
+ for(const i of priority)await addImage(preview.characters[i],'cardImage',snapshot.characters[i].cardImage||snapshot.characters[i].detailImage,280);
+ return preview;
+}
+async function unpackSharePayload(payload,capturePacked){
+ if(payload?.__paFormat===SHARE_CHUNK_FORMAT)return unpackChunkedShare(payload,capturePacked);
  if(payload?.__paFormat!==SHARE_PACK_FORMAT)return payload;
  if(typeof DecompressionStream!=='function')throw new Error('압축된 공유본을 열 수 없는 브라우저예요. 브라우저를 업데이트해 주세요.');
  const bytes=base64ToBytes(String(payload.data||''));
@@ -2310,9 +2341,61 @@ function setPublicUi(){
  const brandSub=document.querySelector('.brand p');if(brandSub&&publicMode)brandSub.textContent='Character Prompt Archive';
 }
 function publicError(message){const grid=document.getElementById('grid');if(grid)grid.innerHTML=`<div class="publicLoadState"><strong>공개 도감을 불러오지 못했어요.</strong><span>${esc(message||'공유 링크나 서버 설정을 확인해 주세요.')}</span></div>`;const rc=document.getElementById('resultCount');if(rc)rc.textContent=`${requestedShareSlug} · 공개본`}
+function applyPublicSnapshot(payload){if(!payload||!Array.isArray(payload.characters))throw new Error('공개된 도감이 없어요.');state=migrateState(payload);state.genres=(state.genres||[]).map(g=>({...g,viewLocked:false,viewPasswordHash:''}))}
+function publicShareRemoved(){document.documentElement.classList.add('public-booting');const screen=document.getElementById('publicBootScreen');screen.innerHTML='<div class="publicBootCard"><strong>공유가 해제되었어요.</strong><span>이 주소의 공개 도감을 더 이상 볼 수 없어요.</span></div>'}
+let publicPreviewPending=false,publicPreviewLoading=false,publicPreviewManifest=null,pendingPreviewOpen=null;
+function showPublicPreview(manifest){
+ if(!manifest?.preview||!Array.isArray(manifest.preview.characters))return false;
+ if($('#detailOverlay')?.classList.contains('open'))closeOverlay('detailOverlay',true);
+ publicPreviewPending=true;publicPreviewManifest=manifest;sessionPrivateUnlocks.clear();sessionViewUnlocks.clear();applyPublicSnapshot(manifest.preview);renderAll();document.dispatchEvent(new Event('prompt-atlas-state-changed'));return true;
+}
+async function hydratePublicShare(manifest,announce=false){
+ if(publicPreviewLoading)return;publicPreviewLoading=true;
+ try{
+  let packed=manifest;const payload=await unpackSharePayload(manifest,p=>{packed=p});if(!payload||!Array.isArray(payload.characters))throw new Error('공유본 확인 실패');
+  if(publicPreviewManifest!==manifest)return;
+  publicPreviewPending=false;publicPreviewManifest=null;applyPublicSnapshot(payload);renderAll();document.dispatchEvent(new Event('prompt-atlas-state-changed'));
+  void writePublicShareCache(requestedShareSlug,packed).catch(()=>{});
+  const waiting=pendingPreviewOpen;pendingPreviewOpen=null;
+  if(waiting?.kind==='character')void openDetail(waiting.id);
+  else if(waiting?.kind==='log'){const item=[...document.querySelectorAll('[data-log-open]')].find(el=>el.dataset.logOpen===waiting.id);item?.click()}
+  if(announce)toast('공유본의 새 내용을 불러왔어요');
+ }catch(e){if(publicPreviewManifest===manifest)toast('상세 내용을 불러오지 못했어요. 눌러서 다시 시도해 주세요.')}
+ finally{publicPreviewLoading=false;if(publicPreviewPending&&publicPreviewManifest&&publicPreviewManifest!==manifest)void hydratePublicShare(publicPreviewManifest)}
+}
+document.addEventListener('click',event=>{
+ if(!publicMode||!publicPreviewPending)return;
+ const log=event.target.closest('[data-log-open]'),featured=event.target.closest('[data-featured-character]');
+ if(!log&&!featured)return;
+ event.preventDefault();event.stopImmediatePropagation();pendingPreviewOpen=log?{kind:'log',id:log.dataset.logOpen}:{kind:'character',id:featured.dataset.featuredCharacter};
+ toast('상세 내용을 준비하고 있어요');if(!publicPreviewLoading&&publicPreviewManifest)void hydratePublicShare(publicPreviewManifest);
+},true);
+document.addEventListener('keydown',event=>{
+ if(!publicMode||!publicPreviewPending||!['Enter',' '].includes(event.key))return;
+ const log=event.target.closest('[data-log-open]');if(!log)return;
+ event.preventDefault();event.stopImmediatePropagation();pendingPreviewOpen={kind:'log',id:log.dataset.logOpen};toast('상세 내용을 준비하고 있어요');if(!publicPreviewLoading&&publicPreviewManifest)void hydratePublicShare(publicPreviewManifest);
+},true);
+async function refreshPublicShare(cachedRevision){
+ try{
+  const raw=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:requestedShareSlug.toLowerCase()}));
+  if(!raw){await deletePublicShareCache(requestedShareSlug).catch(()=>{});publicShareRemoved();return}
+  if(raw.__paRevision===cachedRevision)return;
+  if(showPublicPreview(raw)){void hydratePublicShare(raw,true);return}
+  let packed=raw;const payload=await unpackSharePayload(raw,p=>{packed=p});if(!payload||!Array.isArray(payload.characters))throw new Error('공유본 확인 실패');
+  await writePublicShareCache(requestedShareSlug,packed).catch(()=>{});
+  if($('#detailOverlay')?.classList.contains('open'))closeOverlay('detailOverlay',true);
+  sessionPrivateUnlocks.clear();sessionViewUnlocks.clear();applyPublicSnapshot(payload);renderAll();sanitizeStoredMedia();document.dispatchEvent(new Event('prompt-atlas-state-changed'));toast('공유본의 새 내용을 불러왔어요');
+ }catch(e){if(/no rows|not found/i.test(String(e?.message||''))){await deletePublicShareCache(requestedShareSlug).catch(()=>{});publicShareRemoved()}}
+}
 async function loadPublicShare(){
  await loadShareConfig();setPublicUi();if(!shareConfigured()){publicError('공유 서버가 아직 연결되지 않았어요. 사이트 관리자가 share-config.json을 설정해야 해요.');return false}
- try{const data=await shareRpc('pa_share_get',{p_slug:requestedShareSlug.toLowerCase()});const payload=await unpackSharePayload(data?.payload??data);if(!payload||!Array.isArray(payload.characters))throw new Error('공개된 도감이 없어요.');state=migrateState(payload);state.genres=(state.genres||[]).map(g=>({...g,viewLocked:false,viewPasswordHash:''}));return true}catch(e){publicError(String(e?.message||'공개된 도감을 찾지 못했어요.'));return false}
+ try{
+  const cached=await readPublicShareCache(requestedShareSlug).catch(()=>null);
+  if(cached){try{applyPublicSnapshot(await unpackSharePayload(cached.packed));setTimeout(()=>{void refreshPublicShare(cached.packed.__paRevision)},0);return true}catch{await deletePublicShareCache(requestedShareSlug).catch(()=>{})}}
+  const raw=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:requestedShareSlug.toLowerCase()}));
+  if(showPublicPreview(raw)){setTimeout(()=>{void hydratePublicShare(raw)},0);return true}
+  let packed=raw;const payload=await unpackSharePayload(raw,p=>{packed=p});applyPublicSnapshot(payload);await writePublicShareCache(requestedShareSlug,packed).catch(()=>{});return true;
+ }catch(e){publicError(String(e?.message||'공개된 도감을 찾지 못했어요.'));return false}
 }
 let state;
 try{state=migrateState(JSON.parse(localStorage.getItem('promptAtlasSharedStateV4CleanShare'))||JSON.parse(document.getElementById('promptAtlasSeed').textContent)||defaultState())}catch{state=defaultState()}
@@ -2527,7 +2610,7 @@ function playBookOpening(ch){
  stage.appendChild(book);modal.appendChild(stage);void stage.offsetWidth;ov.classList.add('book-opening');
  setTimeout(()=>{stage.remove();ov.classList.remove('book-opening')},2720)
 }
-async function openDetail(id){const ch=state.characters.find(c=>c.id===id);if(!ch)return;const g=genreDef(ch.genre);if(g?.viewLocked&&!canViewGenre(g)&&!(await ensureGenreViewAccess(g)))return;if(activeDetail&&activeDetail!==id)sessionPrivateUnlocks.delete(activeDetail);sessionPrivateUnlocks.delete(id);activeDetail=id;activeDetailChapter=null;renderDetail();openOverlay('detailOverlay');playBookOpening(ch)}
+async function openDetail(id){if(publicMode&&publicPreviewPending){pendingPreviewOpen={kind:'character',id};toast('상세 내용을 준비하고 있어요');if(!publicPreviewLoading&&publicPreviewManifest)void hydratePublicShare(publicPreviewManifest);return}const ch=state.characters.find(c=>c.id===id);if(!ch)return;const g=genreDef(ch.genre);if(g?.viewLocked&&!canViewGenre(g)&&!(await ensureGenreViewAccess(g)))return;if(activeDetail&&activeDetail!==id)sessionPrivateUnlocks.delete(activeDetail);sessionPrivateUnlocks.delete(id);activeDetail=id;activeDetailChapter=null;renderDetail();openOverlay('detailOverlay');playBookOpening(ch)}
 function renderAlbum(){const ch=state.characters.find(c=>c.id===activeDetail);if(!ch)return;const refs=ch.refs||[];$('#albumTitle').innerHTML=`${esc(ch.name)} · 앨범${ch.albumNote?` <span class="albumTitleNote">${esc(ch.albumNote)}</span>`:''}`;$('#albumBody').innerHTML=refs.length?`<div class="albumGrid">${refs.map((r,i)=>`<button class="albumThumb" data-album-photo="${i}" aria-label="${esc(ch.name)} 참고 이미지 ${i+1} 크게 보기"><img class="protectedImage" draggable="false" src="${refDisplay(r)}" alt="${esc(ch.name)} 참고 이미지 ${i+1}"></button>`).join('')}</div>`:`<div class="albumEmpty">아직 앨범에 저장된 이미지가 없어요.</div>`;$('#albumBody').onclick=e=>{const b=e.target.closest('[data-album-photo]');if(!b)return;activePhotoIndex=Number(b.dataset.albumPhoto)||0;renderPhotoViewer();openOverlay('photoOverlay')}}
 function renderPhotoViewer(){const ch=state.characters.find(c=>c.id===activeDetail);const refs=ch?.refs||[];if(!refs.length)return;activePhotoIndex=Math.max(0,Math.min(activePhotoIndex,refs.length-1));$('#photoTitle').textContent=`${ch.name} · 사진 ${activePhotoIndex+1}`;$('#photoViewerBody').innerHTML=`<div class="photoStage"><img class="protectedImage" draggable="false" src="${refDisplay(refs[activePhotoIndex])}" alt="${esc(ch.name)} 참고 이미지 ${activePhotoIndex+1}"><button class="photoNav prev" id="photoPrev" ${activePhotoIndex<=0?'disabled':''} aria-label="이전 사진">‹</button><button class="photoNav next" id="photoNext" ${activePhotoIndex>=refs.length-1?'disabled':''} aria-label="다음 사진">›</button><div class="photoCounter">${activePhotoIndex+1} / ${refs.length}</div></div>`;const prev=$('#photoPrev'),next=$('#photoNext');if(prev)prev.onclick=()=>{if(activePhotoIndex>0){activePhotoIndex--;renderPhotoViewer()}};if(next)next.onclick=()=>{if(activePhotoIndex<refs.length-1){activePhotoIndex++;renderPhotoViewer()}}}
 function blankCharacter(){const genre=state.settings.genre||state.genres[0]?.name||'';return{id:uid('char'),name:'',partner:'',gender:'',height:'',age:'',featuredRole:'',anniversaryEnabled:false,anniversaryDate:'',anniversaryStartAtOne:true,albumNote:'',youtubeLinks:[],description:'',descriptionHtml:'',genre,classifications:[],attributes:[],tags:[],favorite:false,privateLocked:false,privatePasswordHash:'',cardImage:'',cardImageOriginal:'',cardImageOriginalName:'',cardImageOriginalType:'',cardImageZoom:1,cardImageX:50,cardImageY:50,detailImage:'',detailImageOriginal:'',detailImageOriginalName:'',detailImageOriginalType:'',detailImageZoom:1,detailImageX:50,detailImageY:50,refs:[],chapters:[makeChapter('챕터 1',[makeBlock('기본 프롬프트','')])],createdAt:now(),updatedAt:now(),order:Math.max(-1,...state.characters.map(c=>c.order))+1}}
@@ -3062,24 +3145,25 @@ function renderShare(){
   if(!shareConfigured()){setStatus('공유 서버 연결이 필요해요','공유 서버 연결 상태를 확인해 주세요.','shareError');return}
   button.disabled=true;const token=ownerTokenFor(slug,true),revision=uid('publish');let packed,previousManifest=null,manifestAttempted=false,attemptedParts=[];
   const verify=async()=>{try{const result=await shareRpc('pa_share_get',{p_slug:slug});return(result?.payload??result)?.__paRevision===revision}catch{return false}};
-  const finish=()=>{if(previousManifest)scheduleShareCleanup(slug,token,previousManifest);state.settings.lastShareSlug=slug;save();renderShare();const fresh=$('#sharePublishStatus');fresh.className='shareStatus shareSuccess';fresh.innerHTML=`<strong>공개 완료 ✨</strong><span>${esc(publicShareUrl(slug))}</span>`;toast('공유본 업데이트를 확인했어요')};
+  const finish=async()=>{if(previousManifest)scheduleShareCleanup(slug,token,previousManifest);await writePublicShareCache(slug,packed?.value).catch(()=>{});state.settings.lastShareSlug=slug;save();renderShare();const fresh=$('#sharePublishStatus');fresh.className='shareStatus shareSuccess';fresh.innerHTML=`<strong>공개 완료 ✨</strong><span>${esc(publicShareUrl(slug))}</span>`;toast('공유본 업데이트를 확인했어요')};
   try{
-   setStatus('공유본 준비 중…','이미지 품질을 바꾸지 않고 전송 데이터만 압축하고 있어요.');packed=await packSharePayload(publicSnapshot(),revision);
+   setStatus('공유본 준비 중…','이미지 원본을 유지하면서 전송 데이터와 첫 화면을 준비하고 있어요.');const snapshot=publicSnapshot();packed=await packSharePayload(snapshot,revision);
    const size=(packed.packedBytes/1024/1024).toFixed(1),chunkPlan=shareChunkDescriptors(packed,revision);
    if(chunkPlan){
     try{previousManifest=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:slug}))}catch{}
     let done=0;setStatus('공유본 전송 중…',`${size}MB를 ${chunkPlan.parts.length}개로 나눠 저장해요. 이 창을 닫지 말아 주세요. (0/${chunkPlan.parts.length})`);
     await shareLimited(chunkPlan.parts,3,async(part,index)=>{attemptedParts.push(part);await publishSharePart(part,index,revision,token);done++;setStatus('공유본 전송 중…',`${size}MB · 저장 완료 ${done}/${chunkPlan.parts.length}. 이 창을 닫지 말아 주세요.`)});
-    const manifest={__paFormat:SHARE_CHUNK_FORMAT,__paRevision:revision,encoding:packed.compressed?'gzip-base64':'json',totalLength:chunkPlan.encoded.length,chunks:chunkPlan.parts.map(({slug,length,hash})=>({slug,length,hash}))};
+    setStatus('첫 화면 준비 중…','방문자가 바로 볼 수 있는 화면을 만들고 있어요.');const preview=await makePublicPreview(snapshot);
+    const manifest={__paFormat:SHARE_CHUNK_FORMAT,__paRevision:revision,encoding:packed.compressed?'gzip-base64':'json',totalLength:chunkPlan.encoded.length,chunks:chunkPlan.parts.map(({slug,length,hash})=>({slug,length,hash})),preview};
     setStatus('업데이트 확인 중…','모든 조각을 저장했어요. 이제 공개 주소를 새 버전으로 바꿔 확인해요.');manifestAttempted=true;
     await shareRpc('pa_share_publish',{p_slug:slug,p_payload:manifest,p_token:token});
    }else{
     setStatus('공개 중…',`전송 크기 ${size}MB · 저장한 뒤 다시 읽어 확인할게요.`);manifestAttempted=true;
     await shareRpc('pa_share_publish',{p_slug:slug,p_payload:packed.value,p_token:token});
    }
-   if(await verify())finish();else setStatus('업데이트 확인 필요','서버 응답은 받았지만 새 공유본을 다시 읽어 확인하지 못했어요. 잠시 후 공유 링크를 확인해 주세요.','shareError');
+   if(await verify())await finish();else setStatus('업데이트 확인 필요','서버 응답은 받았지만 새 공유본을 다시 읽어 확인하지 못했어요. 잠시 후 공유 링크를 확인해 주세요.','shareError');
   }catch(e){
-   if(await verify()){finish();return}
+   if(await verify()){await finish();return}
    if(attemptedParts.length&&!manifestAttempted)scheduleShareCleanup(slug,token,{__paFormat:SHARE_CHUNK_FORMAT,chunks:attemptedParts},1000);
    const m=String(e?.message||'');
    if(/slug_taken|already|owner|token/i.test(m)){setStatus('주소 권한을 확인해 주세요','이미 사용 중인 주소이거나 이 브라우저에 해당 주소의 공유 권한이 없어요. 기존 공유본은 그대로예요.','shareError')}
@@ -3088,7 +3172,7 @@ function renderShare(){
   }finally{if(button.isConnected)button.disabled=false}
  };
  const copy=$('#copyShareLinkBtn');if(copy)copy.onclick=()=>copyText($('#shareLinkOutput').value,'공유 링크를 복사했어요');const open=$('#openShareLinkBtn');if(open)open.onclick=()=>window.open($('#shareLinkOutput').value,'_blank','noopener');
- const del=$('#deleteShareBtn');if(del)del.onclick=async()=>{const slug=String(state.settings.lastShareSlug||'').toLowerCase(),token=ownerTokenFor(slug,false);if(!slug||!token)return;if(!confirm(`/${slug} 공개본을 삭제할까요?`))return;try{let manifest=null;try{manifest=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:slug}))}catch{}await shareRpc('pa_share_delete',{p_slug:slug,p_token:token});if(manifest)scheduleShareCleanup(slug,token,manifest,1000);forgetOwnerToken(slug);state.settings.lastShareSlug='';save();renderShare();toast('공유본을 삭제했어요')}catch(e){setStatus('공유 해제 실패',String(e?.message||'서버 설정을 확인해 주세요.'),'shareError')}};
+ const del=$('#deleteShareBtn');if(del)del.onclick=async()=>{const slug=String(state.settings.lastShareSlug||'').toLowerCase(),token=ownerTokenFor(slug,false);if(!slug||!token)return;if(!confirm(`/${slug} 공개본을 삭제할까요?`))return;try{let manifest=null;try{manifest=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:slug}))}catch{}await shareRpc('pa_share_delete',{p_slug:slug,p_token:token});void deletePublicShareCache(slug).catch(()=>{});if(manifest)scheduleShareCleanup(slug,token,manifest,1000);forgetOwnerToken(slug);state.settings.lastShareSlug='';save();renderShare();toast('공유본을 삭제했어요')}catch(e){setStatus('공유 해제 실패',String(e?.message||'서버 설정을 확인해 주세요.'),'shareError')}};
 }
 
 function renderFilterModal(){$('#filterBody').innerHTML=`<div class="panel"><h3>빠른 필터</h3><label class="checkRow"><input type="checkbox" id="fAdded" ${state.settings.recentAdded?'checked':''}> 최근 7일 추가</label><label class="checkRow"><input type="checkbox" id="fUpdated" ${state.settings.recentUpdated?'checked':''}> 최근 7일 수정</label></div><div class="panel"><div class="inline"><button class="btn" id="openManagerFromFilter">장르 · 분류 · 속성 관리</button><button class="btn" id="openBackupFromFilter">백업 · 복원</button></div></div>`;$('#fAdded').onchange=e=>{state.settings.recentAdded=e.target.checked;save();renderAll()};$('#fUpdated').onchange=e=>{state.settings.recentUpdated=e.target.checked;save();renderAll()};$('#openManagerFromFilter').onclick=()=>{closeOverlay('filterOverlay');renderManager();openOverlay('managerOverlay')};$('#openBackupFromFilter').onclick=()=>{closeOverlay('filterOverlay');renderBackup();openOverlay('backupOverlay')}}
@@ -3448,7 +3532,7 @@ bootApp();
     const showPage=name=>{Object.entries(pages).forEach(([key,page])=>page.hidden=key!==name);tabs.forEach(tab=>tab.classList.toggle('active',tab.dataset.atlasPage===name));if(name==='persona')window.dispatchEvent(new Event('resize'));if(name==='main')renderMain();if(name==='logs'){refreshAtlasData();renderLogFilters();renderAtlasLogs()}window.scrollTo({top:0,behavior:'smooth'})};
     tabs.forEach(tab=>tab.addEventListener('click',()=>showPage(tab.dataset.atlasPage)));
     q('atlasFeaturedPair').addEventListener('click',event=>{const target=event.target.closest('[data-featured-character]');if(target)bridge?.openCharacterDetail?.(target.dataset.featuredCharacter)});
-    document.addEventListener('prompt-atlas-state-changed',()=>{if(initialized)renderMain()});
+    document.addEventListener('prompt-atlas-state-changed',()=>{if(!initialized)return;refreshAtlasData();renderMain();if(!q('atlasPageLogs').hidden){renderLogFilters();renderAtlasLogs()}});
     q('atlasMainEditForm').querySelector('.atlasLogForm').insertAdjacentHTML('afterbegin',`<div class="atlasLogField full"><span>메인 사진 · 정사각형</span><div class="atlasPortraitEditor"><div class="atlasPortraitPreview" id="atlasPortraitPreview"></div><div class="atlasPortraitControls"><div class="atlasPortraitButtons"><button class="btn small" id="atlasPortraitChoose" type="button">사진 선택</button><button class="btn small danger" id="atlasPortraitRemove" type="button">사진 삭제</button><button class="btn small" id="atlasPortraitDownload" type="button">원본 다운로드</button><input id="atlasPortraitFile" type="file" accept="image/*" hidden></div><div class="atlasPortraitSlider"><label for="atlasPortraitZoom">확대</label><input id="atlasPortraitZoom" type="range" min="1" max="2.4" step="0.01"><output id="atlasPortraitZoomValue"></output></div><div class="atlasPortraitSlider"><label for="atlasPortraitX">가로</label><input id="atlasPortraitX" type="range" min="0" max="100"><output id="atlasPortraitXValue"></output></div><div class="atlasPortraitSlider"><label for="atlasPortraitY">세로</label><input id="atlasPortraitY" type="range" min="0" max="100"><output id="atlasPortraitYValue"></output></div><small class="atlasPortraitHint">사진을 드래그해서 위치를 옮기고, 휠이나 두 손가락으로 확대할 수 있어요. 비우면 아래 대표 글자가 표시됩니다.</small></div></div></div>`);bindPortraitEditor();
     q('atlasMainEditBtn').addEventListener('click',openMainEditor);q('atlasMainEditClose').addEventListener('click',closeMainEditor);q('atlasMainEditCancel').addEventListener('click',closeMainEditor);q('atlasMainEditModal').addEventListener('mousedown',event=>{if(event.target===q('atlasMainEditModal'))closeMainEditor()});
     q('atlasMainEditForm').addEventListener('submit',async event=>{event.preventDefault();const main=mainData(),previous={...main};Object.assign(main,mainDraft);main.portrait=q('atlasEditPortrait').value.trim()||'마로';main.eyebrow=q('atlasEditEyebrow').value.trim();main.title=q('atlasEditTitle').value.trim();main.intro=q('atlasEditIntro').value.trim();main.chips=q('atlasEditChips').value.split(',').map(value=>value.trim()).filter(Boolean);main.guideTitle=q('atlasEditGuideTitle').value.trim()||'이곳에서는';main.guideItems=q('atlasEditGuideItems').value.split('\n').map(value=>value.trim()).filter(Boolean);main.likes=q('atlasEditLikes').value.trim();main.dislikes=q('atlasEditDislikes').value.trim();if(await saveState()){closeMainEditor();renderMain()}else{Object.assign(main,previous);alert('저장되지 않았어요. 이 창을 닫지 말고 백업하거나 저장 공간을 확인해 주세요.')}});

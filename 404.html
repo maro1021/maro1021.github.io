@@ -1866,7 +1866,8 @@ body.public-view .publicBadge{display:inline-flex}body.public-view #settingsBtn,
 .atlasPortraitControls{display:grid;gap:10px;min-width:0}.atlasPortraitButtons{display:flex;gap:8px;flex-wrap:wrap}
 .atlasPortraitSlider{display:grid;grid-template-columns:65px minmax(0,1fr) 45px;align-items:center;gap:6px;color:var(--muted);font-size:12px}
 .atlasPortraitSlider input{min-width:0;accent-color:var(--accent)}.atlasPortraitHint{font-size:11px;line-height:1.5;color:var(--muted)}
-.cardActions{display:flex!important;justify-content:flex-end!important;margin-top:auto!important}
+/* Only the badge row absorbs spare height; keep the dashed action divider at a fixed distance. */
+.cardActions{display:flex!important;justify-content:flex-end!important;margin-top:10px!important}
 .cardActions .iconMini.edit{width:44px;min-width:44px}
 .card.dragging,.card.touchDragging{opacity:.42}.card.dragTarget{outline:1px dashed var(--accent);outline-offset:2px}
 .cardDragGhost{position:fixed!important;z-index:100010;pointer-events:none!important;opacity:.92!important;box-shadow:0 24px 42px rgba(20,25,50,.24)!important;transform:scale(.94)!important}

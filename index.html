@@ -1887,6 +1887,35 @@ body.public-view .publicBadge{display:inline-flex}body.public-view #settingsBtn,
 .detailVideo iframe{display:block;width:100%;aspect-ratio:16/9;border:0}
 @media(max-width:560px){.atlasPortraitEditor{grid-template-columns:1fr}.atlasPortraitPreview{width:min(190px,100%);margin:auto}}
 </style>
+<style id="persona-side-decorations">
+/* Decorations float in the spare desktop margins without changing the card grid. */
+#atlasPagePersona{position:relative;isolation:isolate}
+.personaDecoLayer{position:absolute;top:0;left:50%;width:100vw;height:100%;transform:translateX(-50%);z-index:6;pointer-events:none}
+.personaDecoItem{position:absolute;width:var(--deco-size);transform:translate(-50%,-50%) rotate(var(--deco-rotate));pointer-events:none;user-select:none;-webkit-user-select:none;will-change:transform}
+.personaDecoArt{display:block;width:100%;height:auto;max-width:none;filter:drop-shadow(0 7px 10px rgba(72,61,91,.16));animation:personaDecoSway var(--deco-duration,3.8s) ease-in-out var(--deco-delay,0s) infinite alternate;transform-origin:50% 88%;-webkit-user-drag:none}
+.personaDecoItem.noSway .personaDecoArt{animation:none}
+@keyframes personaDecoSway{from{transform:translate(-2px,1px) rotate(-4deg)}to{transform:translate(3px,-6px) rotate(4deg)}}
+.personaDecoLayer.editing .personaDecoItem{pointer-events:auto;cursor:grab;touch-action:none;border-radius:18px}
+.personaDecoLayer.editing .personaDecoItem:hover,.personaDecoLayer.editing .personaDecoItem.selected{outline:2px dashed var(--accent);outline-offset:5px}
+.personaDecoLayer.editing .personaDecoItem.dragging{cursor:grabbing}
+.personaDecoOpen{height:42px;white-space:nowrap}
+.personaDecoPanel{position:fixed;top:clamp(90px,17vh,180px);right:18px;width:min(348px,calc(100vw - 36px));max-height:calc(100vh - 110px);overflow:auto;z-index:70;padding:16px;border:1px solid color-mix(in srgb,var(--accent) 37%,var(--line));border-radius:22px;background:color-mix(in srgb,var(--panel) 96%,var(--accent) 4%);box-shadow:0 18px 55px rgba(31,24,60,.22);backdrop-filter:blur(18px)}
+.personaDecoPanel[hidden]{display:none!important}
+.personaDecoPanelHead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:5px}.personaDecoPanelHead h3{font-size:17px;margin:0}.personaDecoPanelHead button{border:1px solid var(--line);border-radius:10px;background:var(--panel2);color:var(--text);width:32px;height:32px;font-size:21px}
+.personaDecoHint{font-size:12px;color:var(--muted);line-height:1.6;margin:0 0 12px}.personaStickerShelf{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.personaStickerShelf button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:77px;padding:6px 2px;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--muted);font-size:10px;font-weight:800}
+.personaStickerShelf button:hover{border-color:var(--accent);background:var(--panel2)}.personaStickerShelf img{width:45px;height:45px;object-fit:contain}
+.personaDecoUpload{display:block;width:100%;margin:12px 0;padding:10px;border:1px dashed var(--accent);border-radius:12px;background:var(--panel2);color:var(--text);font-size:12px;font-weight:850;text-align:center;cursor:pointer}.personaDecoUpload input{position:absolute;width:1px;height:1px;opacity:0}
+.personaDecoList{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}.personaDecoList button{display:flex;align-items:center;gap:4px;padding:5px 8px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--muted);font-size:11px;max-width:140px}.personaDecoList button.selected{border-color:var(--accent);color:var(--accent)}.personaDecoList img{width:24px;height:24px;object-fit:contain}.personaDecoList span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.personaDecoSelected{display:grid;gap:11px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}.personaDecoSelected[hidden]{display:none!important}.personaDecoSelected strong{font-size:12px}.personaDecoSelected label{display:grid;gap:4px;color:var(--muted);font-size:11px;font-weight:850}.personaDecoSelected label span{display:flex;justify-content:space-between}.personaDecoSelected input[type=range]{width:100%;accent-color:var(--accent)}.personaDecoSelected .personaDecoSwitch{display:flex;align-items:center;gap:7px}.personaDecoSelected .personaDecoSwitch input{accent-color:var(--accent)}.personaDecoSelected .btn{width:100%}
+.personaDecoMobileNote{display:none;font-size:11px;color:var(--muted);line-height:1.5;margin:0 0 8px}
+.personaDecoLayer.tooNarrow{display:none!important}.personaDecoLayer.tooNarrow + .personaDecoPanel .personaDecoMobileNote{display:block}
+body.public-view #personaDecoOpen,body.public-view .personaDecoPanel{display:none!important}
+html.base-landing .personaDecoPanel{display:none!important}
+@media(max-width:1120px){.personaDecoLayer{display:none!important}.personaDecoMobileNote{display:block}}
+@media(max-width:760px){.personaDecoOpen{height:40px;padding:8px 10px}.personaDecoPanel{top:auto;right:10px;bottom:10px;max-height:min(78vh,680px)}}
+@media(prefers-reduced-motion:reduce){.personaDecoArt{animation:none!important}}
+</style>
 </head>
 <body>
 <main class="baseLanding"><div class="baseLandingCard"><span aria-hidden="true">✦</span><h1>공유 주소로 방문해 주세요</h1><p>전달받은 주소를 열면 해당 도감을 볼 수 있어요.</p></div></main>
@@ -1924,9 +1953,25 @@ body.public-view .publicBadge{display:inline-flex}body.public-view #settingsBtn,
     <button class="btn" id="mobileMoreBtn">필터 · 설정</button>
   </section>
 
-  <div class="genreFilterGroup"><div class="genreFilterTop"><div class="filterRow" id="genreFilters"></div><div class="genreQuickActions"><button class="genreManageBtn" id="genreManageBtn" type="button" title="장르 · 분류 · 잠금 설정" aria-label="장르 및 분류와 잠금 설정">⚙</button><button class="btn primary genreAddCharacter" id="addBtn" type="button">＋ 캐릭터</button></div></div><div class="filterRow roleFilterRow" id="roleFilters"></div></div>
+  <div class="genreFilterGroup"><div class="genreFilterTop"><div class="filterRow" id="genreFilters"></div><div class="genreQuickActions"><button class="btn personaDecoOpen" id="personaDecoOpen" type="button" aria-label="페이지 스티커 꾸미기">✦ 꾸미기</button><button class="genreManageBtn" id="genreManageBtn" type="button" title="장르 · 분류 · 잠금 설정" aria-label="장르 및 분류와 잠금 설정">⚙</button><button class="btn primary genreAddCharacter" id="addBtn" type="button">＋ 캐릭터</button></div></div><div class="filterRow roleFilterRow" id="roleFilters"></div></div>
   <div class="metaRow"><div id="resultCount">0 characters</div><div class="sortWrap"><label>정렬</label><select class="select" id="sortSelect"><option value="manual">직접 지정 순서</option><option value="name">이름순</option><option value="created">최근 등록순</option><option value="updated">최근 수정순</option></select></div></div>
   <main class="grid auto" id="grid"></main>
+  <div class="personaDecoLayer" id="personaDecoLayer" aria-label="페이지 장식"></div>
+  <aside class="personaDecoPanel" id="personaDecoPanel" aria-label="페이지 꾸미기" hidden>
+    <div class="personaDecoPanelHead"><h3>✦ 여백 꾸미기</h3><button id="personaDecoClose" type="button" aria-label="꾸미기 닫기">×</button></div>
+    <p class="personaDecoHint">스티커를 추가한 뒤 화면에서 드래그해 원하는 곳에 놓아 주세요. 살랑이는 움직임은 공유본에도 보여요.</p>
+    <p class="personaDecoMobileNote">좁은 화면에는 카드가 가려지지 않도록 장식을 숨겨요. 넓은 화면에서 위치를 조절해 주세요.</p>
+    <div class="personaStickerShelf" id="personaStickerShelf"></div>
+    <label class="personaDecoUpload">＋ 투명 이미지 올리기 (PNG · WebP · GIF)<input id="personaDecoFile" type="file" accept="image/png,image/webp,image/gif"></label>
+    <div class="personaDecoList" id="personaDecoList"></div>
+    <div class="personaDecoSelected" id="personaDecoSelected" hidden>
+      <strong id="personaDecoSelectedName"></strong>
+      <label><span>크기 <output id="personaDecoSizeValue"></output></span><input id="personaDecoSize" type="range" min="48" max="320" step="2"></label>
+      <label><span>기울기 <output id="personaDecoRotateValue"></output></span><input id="personaDecoRotate" type="range" min="-30" max="30" step="1"></label>
+      <label class="personaDecoSwitch"><input id="personaDecoSway" type="checkbox" checked> 살랑살랑 흔들기</label>
+      <button class="btn danger" id="personaDecoRemove" type="button">선택한 장식 삭제</button>
+    </div>
+  </aside>
   </section>
 
   <section class="atlasPage" id="atlasPageLogs" hidden>
@@ -1963,7 +2008,7 @@ body.public-view .publicBadge{display:inline-flex}body.public-view #settingsBtn,
 (()=>{
 'use strict';
 const DEFAULT_SETTINGS={grid:'auto',sort:'manual',genre:'',role:'all',tag:'all',recentAdded:false,recentUpdated:false,detailPromptMode:'list',accentColor:'#6e67e8',secondaryColor:'#ff9fc5',decoColor:'#7bdcc5',siteTitle:'',siteLogo:'',shareSupabaseUrl:'',shareSupabaseAnonKey:'',lastShareSlug:'',sharePrompts:true,shareAlbum:true,cursorTheme:'hamster',cursorTrail:true,cursorTrailLength:48};
-const DEFAULT_SITE_PAGES={main:{portrait:'마로',portraitImage:'',portraitImageOriginal:'',portraitImageOriginalName:'',portraitZoom:1,portraitX:50,portraitY:50,eyebrow:'WELCOME TO MY ARCHIVE',title:'안녕하세요, 마로예요 ♡',intro:'좋아하는 캐릭터와 페어, 프롬프트와 오래 기억하고 싶은 장면을 차곡차곡 모아두는 개인 아카이브예요. 천천히 둘러보고, 페르소나의 설정과 이미지 프롬프트도 함께 구경해 주세요.',chips:['캐릭터 창작','세계관 설정','이미지 프롬프트','로그 기록'],guideTitle:'이곳에서는',guideItems:['페르소나 프롬프트에서 캐릭터 소개, 이미지, 챕터별 프롬프트를 볼 수 있어요.','로그에서 장르별·캐릭터별로 중요한 장면을 정리할 수 있어요.','설정과 기록은 계속 추가되며 마음에 드는 순간을 오래 보관합니다.'],likes:'',dislikes:''}};
+const DEFAULT_SITE_PAGES={main:{portrait:'마로',portraitImage:'',portraitImageOriginal:'',portraitImageOriginalName:'',portraitZoom:1,portraitX:50,portraitY:50,eyebrow:'WELCOME TO MY ARCHIVE',title:'안녕하세요, 마로예요 ♡',intro:'좋아하는 캐릭터와 페어, 프롬프트와 오래 기억하고 싶은 장면을 차곡차곡 모아두는 개인 아카이브예요. 천천히 둘러보고, 페르소나의 설정과 이미지 프롬프트도 함께 구경해 주세요.',chips:['캐릭터 창작','세계관 설정','이미지 프롬프트','로그 기록'],guideTitle:'이곳에서는',guideItems:['페르소나 프롬프트에서 캐릭터 소개, 이미지, 챕터별 프롬프트를 볼 수 있어요.','로그에서 장르별·캐릭터별로 중요한 장면을 정리할 수 있어요.','설정과 기록은 계속 추가되며 마음에 드는 순간을 오래 보관합니다.'],likes:'',dislikes:''},personaDecorations:[]};
 const now=()=>Date.now();
 const uid=(p='id')=>`${p}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`;
 const esc=s=>String(s??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));
@@ -2397,6 +2442,13 @@ async function makePublicPreview(snapshot){
  await addImage(preview.sitePages.main,'portraitImage',main.portraitImage,280);
  const priority=preview.characters.map((_,i)=>i).sort((a,b)=>Number(snapshot.characters[b].featuredRole==='main')-Number(snapshot.characters[a].featuredRole==='main')||Number(snapshot.characters[b].featuredRole==='sub')-Number(snapshot.characters[a].featuredRole==='sub')||a-b);
  for(const i of priority)await addImage(preview.characters[i],'cardImage',snapshot.characters[i].cardImage||snapshot.characters[i].detailImage,280);
+ // Tiny decorations can appear with the instant preview; large uploaded images wait for the full share.
+ preview.sitePages.personaDecorations=[];
+ for(const decoration of snapshot.sitePages?.personaDecorations||[]){
+  const copy={...decoration};if(copy.kind==='custom'&&String(copy.src||'').length>50000)continue;
+  const added=JSON.stringify(copy).length;if(size+added>limit)continue;
+  preview.sitePages.personaDecorations.push(copy);size+=added;
+ }
  return preview;
 }
 async function unpackSharePayload(payload,capturePacked){
@@ -3633,5 +3685,95 @@ bootApp();
 })();
 </script>
 
+<script id="persona-side-decorations-script">
+(()=>{
+  const svg=body=>`<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">${body}</svg>`;
+  const stickers=[
+    {key:'ribbon',name:'리본',art:svg('<path d="M77 69C55 21 22 26 23 62c1 26 34 23 54 14-20 17-34 43-21 52 14 11 31-21 30-43 4 23 20 52 34 42 16-11-4-38-26-51 22 8 49 9 49-16 0-34-40-34-56 9z" fill="#f99ac6" stroke="#ca6999" stroke-width="5" stroke-linejoin="round"/><path d="M78 69c7-6 17-6 25 1l-5 20c-7 5-14 5-20-1z" fill="#ffe4f0" stroke="#ca6999" stroke-width="5"/>')},
+    {key:'star',name:'별빛',art:svg('<path d="m80 15 13 42 43 2-34 27 12 42-34-25-35 25 12-42-34-27 44-2z" fill="#ffe894" stroke="#cda65c" stroke-width="5" stroke-linejoin="round"/><path d="m17 25 4 9 9 4-9 4-4 9-4-9-9-4 9-4zM137 112l4 8 8 4-8 4-4 8-4-8-8-4 8-4z" fill="#ffb5d1"/><path d="m69 68 4-5m17 0 4 5m-21 16q7 8 14 0" fill="none" stroke="#af8a65" stroke-width="4" stroke-linecap="round"/>')},
+    {key:'flower',name:'꽃송이',art:svg('<g fill="#ffd9e9" stroke="#d88fb3" stroke-width="4"><ellipse cx="80" cy="39" rx="20" ry="29"/><ellipse cx="119" cy="68" rx="20" ry="29" transform="rotate(72 119 68)"/><ellipse cx="104" cy="113" rx="20" ry="29" transform="rotate(144 104 113)"/><ellipse cx="56" cy="113" rx="20" ry="29" transform="rotate(216 56 113)"/><ellipse cx="41" cy="68" rx="20" ry="29" transform="rotate(288 41 68)"/></g><circle cx="80" cy="80" r="22" fill="#fff3ab" stroke="#d8ae61" stroke-width="4"/><circle cx="74" cy="78" r="2.5" fill="#9d7e71"/><circle cx="87" cy="78" r="2.5" fill="#9d7e71"/><path d="M74 88q6 6 13 0" fill="none" stroke="#9d7e71" stroke-width="3" stroke-linecap="round"/>')},
+    {key:'heart',name:'하트',art:svg('<path d="M80 132C64 118 19 87 18 55 17 16 66 9 80 45c14-36 63-29 62 10-1 32-46 63-62 77z" fill="#ffc0d6" stroke="#cf779c" stroke-width="5" stroke-linejoin="round"/><path d="M34 50q3-17 19-18" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" opacity=".8"/><path d="m122 16 4 8 8 4-8 4-4 8-4-8-8-4 8-4z" fill="#fff2ac"/>')},
+    {key:'butterfly',name:'나비',art:svg('<path d="M78 74C55 15 14 22 23 61c4 18 27 23 47 19-29 5-36 33-19 43 13 8 27-7 31-31M82 74c23-59 64-52 55-13-4 18-27 23-47 19 29 5 36 33 19 43-13 8-27-7-31-31" fill="#b7e5ef" stroke="#86b9d3" stroke-width="5" stroke-linejoin="round"/><path d="M79 62q-14-24-26-23m29 23q14-24 26-23" fill="none" stroke="#8d719e" stroke-width="4" stroke-linecap="round"/><ellipse cx="80" cy="81" rx="8" ry="26" fill="#a28ab5"/><circle cx="46" cy="60" r="8" fill="#fff" opacity=".72"/><circle cx="114" cy="60" r="8" fill="#fff" opacity=".72"/>')},
+    {key:'paw',name:'발바닥',art:svg('<path d="M80 79c-16 0-20 14-30 21-9 6-11 19-3 28 10 12 23 1 33 0 10 1 23 12 33 0 8-9 6-22-3-28-10-7-14-21-30-21z" fill="#ffc8d6" stroke="#c58da0" stroke-width="5"/><g fill="#ffdbe2" stroke="#c58da0" stroke-width="4"><ellipse cx="37" cy="71" rx="10" ry="15" transform="rotate(-19 37 71)"/><ellipse cx="62" cy="51" rx="10" ry="16" transform="rotate(-9 62 51)"/><ellipse cx="98" cy="51" rx="10" ry="16" transform="rotate(9 98 51)"/><ellipse cx="123" cy="71" rx="10" ry="15" transform="rotate(19 123 71)"/></g>')},
+    {key:'moon',name:'초승달',art:svg('<path d="M109 20a58 58 0 1 0 31 102A62 62 0 0 1 109 20z" fill="#fff0b6" stroke="#d6b782" stroke-width="5"/><path d="m32 24 4 9 9 4-9 4-4 9-4-9-9-4 9-4zM127 18l3 7 7 3-7 3-3 7-3-7-7-3 7-3zM120 133l3 7 7 3-7 3-3 7-3-7-7-3 7-3z" fill="#dfc7fa"/>')},
+    {key:'cloud',name:'구름',art:svg('<path d="M42 115c-20 0-30-12-30-28 0-15 12-27 27-28C44 39 59 29 77 31c16 1 28 11 32 27 22-3 39 10 39 29 0 16-13 28-32 28z" fill="#f9fbff" stroke="#a6b7d4" stroke-width="5"/><path d="M50 82q5-8 12 0m32 0q6-8 12 0M69 94q11 9 22 0" fill="none" stroke="#a7a8c4" stroke-width="4" stroke-linecap="round"/><ellipse cx="47" cy="91" rx="8" ry="4" fill="#f8c6d9"/><ellipse cx="113" cy="91" rx="8" ry="4" fill="#f8c6d9"/>')}
+  ];
+  const sources=Object.fromEntries(stickers.map(s=>[s.key,'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(s.art)]));
+  const byId=id=>document.getElementById(id),page=byId('atlasPagePersona'),layer=byId('personaDecoLayer'),panel=byId('personaDecoPanel');
+  let bridge,selectedId=null,dragging=null;
+  const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
+  const items=()=>Array.isArray(bridge?.getState()?.sitePages?.personaDecorations)?bridge.getState().sitePages.personaDecorations:[];
+  const editableItems=()=>{const state=bridge.getState();state.sitePages=state.sitePages||{};return state.sitePages.personaDecorations=Array.isArray(state.sitePages.personaDecorations)?state.sitePages.personaDecorations:[]};
+  const sourceFor=item=>item.kind==='builtin'?sources[item.sticker]||'':/^data:image\/(png|webp|gif);base64,/i.test(String(item.src||''))?item.src:'';
+  const selected=()=>items().find(item=>item.id===selectedId);
+  const updateFit=()=>{const rect=page.getBoundingClientRect(),sideSpace=(window.innerWidth-rect.width)/2;layer.classList.toggle('tooNarrow',sideSpace<136);panel.style.right=window.innerWidth<=760?'':Math.max(18,window.innerWidth-rect.right+18)+'px'};
+  async function saveChange(){const okay=await bridge.save();if(!okay)alert('꾸미기 변경을 저장하지 못했어요. 브라우저 저장 공간을 확인해 주세요.');return okay}
+  function paintItem(node,item){node.style.left=clamp(Number(item.x)||0,0,100)+'%';node.style.top=Math.max(0,Number(item.y)||0)+'px';node.style.setProperty('--deco-size',clamp(Number(item.size)||150,48,320)+'px');node.style.setProperty('--deco-rotate',clamp(Number(item.rotate)||0,-30,30)+'deg');node.style.setProperty('--deco-duration',(3.4+(String(item.id).length%5)*.33)+'s');node.style.setProperty('--deco-delay',(-.25*(String(item.id).length%7))+'s');node.classList.toggle('noSway',item.sway===false)}
+  function render(){
+    if(!bridge)return;
+    updateFit();
+    const publicView=bridge.isPublic();panel.hidden=publicView||panel.hidden;
+    if(publicView)selectedId=null;
+    if(selectedId&&!selected())selectedId=null;
+    layer.classList.toggle('editing',!publicView&&!panel.hidden);
+    layer.replaceChildren();
+    for(const item of items()){
+      const src=sourceFor(item);if(!src)continue;
+      const node=document.createElement('div');node.className='personaDecoItem';node.dataset.decoId=item.id;node.classList.toggle('selected',item.id===selectedId);node.setAttribute('aria-label',item.name||'장식');
+      if(!publicView)node.tabIndex=panel.hidden?-1:0;
+      const image=document.createElement('img');image.className='personaDecoArt';image.src=src;image.alt='';image.draggable=false;node.appendChild(image);paintItem(node,item);layer.appendChild(node);
+    }
+    const list=byId('personaDecoList');list.replaceChildren();
+    items().forEach(item=>{const src=sourceFor(item);if(!src)return;const button=document.createElement('button');button.type='button';button.dataset.selectDeco=item.id;button.classList.toggle('selected',item.id===selectedId);const img=document.createElement('img');img.src=src;img.alt='';const name=document.createElement('span');name.textContent=item.name||'이미지';button.append(img,name);list.appendChild(button)});
+    const active=selected(),controls=byId('personaDecoSelected');controls.hidden=!active;
+    if(active){byId('personaDecoSelectedName').textContent=active.name||'이미지';byId('personaDecoSize').value=clamp(Number(active.size)||150,48,320);byId('personaDecoSizeValue').textContent=byId('personaDecoSize').value+'px';byId('personaDecoRotate').value=clamp(Number(active.rotate)||0,-30,30);byId('personaDecoRotateValue').textContent=byId('personaDecoRotate').value+'°';byId('personaDecoSway').checked=active.sway!==false}
+  }
+  function addDecoration(part){
+    const list=editableItems();if(list.length>=20){alert('장식은 20개까지 놓을 수 있어요.');return}
+    const pageRect=page.getBoundingClientRect(),leftCenter=Math.max(56,pageRect.left/2),rightCenter=window.innerWidth-leftCenter;
+    const left=list.length%2===0,x=100*(left?leftCenter:rightCenter)/window.innerWidth;
+    const visibleY=window.innerHeight*.48-page.getBoundingClientRect().top;
+    const entry={id:'deco-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8),...part,x:Math.round(x*100)/100,y:Math.round(clamp(visibleY,100,Math.max(100,page.offsetHeight-45))),size:part.kind==='custom'?170:130,rotate:0,sway:true};
+    list.push(entry);selectedId=entry.id;render();
+    void saveChange().then(ok=>{if(!ok){const index=list.indexOf(entry);if(index>=0)list.splice(index,1);render()}});
+  }
+  function init(){
+    bridge=window.PromptAtlasBridge;if(!bridge)return;
+    const shelf=byId('personaStickerShelf');stickers.forEach(sticker=>{const button=document.createElement('button');button.type='button';button.title=sticker.name;const image=document.createElement('img');image.src=sources[sticker.key];image.alt='';const name=document.createElement('span');name.textContent=sticker.name;button.append(image,name);button.addEventListener('click',()=>addDecoration({kind:'builtin',sticker:sticker.key,name:sticker.name}));shelf.appendChild(button)});
+    byId('personaDecoOpen').addEventListener('click',()=>{if(bridge.isPublic())return;panel.hidden=!panel.hidden;byId('personaDecoOpen').setAttribute('aria-pressed',String(!panel.hidden));render()});
+    byId('personaDecoClose').addEventListener('click',()=>{panel.hidden=true;byId('personaDecoOpen').setAttribute('aria-pressed','false');render()});
+    byId('personaDecoFile').addEventListener('change',async event=>{
+      const file=event.target.files?.[0];event.target.value='';if(!file)return;
+      if(!['image/png','image/webp','image/gif'].includes(file.type)){alert('투명 배경을 쓸 수 있는 PNG, WebP 또는 GIF 파일을 선택해 주세요.');return}
+      if(file.size>2*1024*1024){alert('공유본의 저장 용량을 위해 이미지 한 장은 2MB 이하로 골라 주세요. 화질은 변경하지 않아요.');return}
+      if(items().filter(item=>item.kind==='custom').length>=6){alert('올린 이미지는 6장까지 추가할 수 있어요.');return}
+      try{const result=await bridge.prepareImage(file);if(!/^data:image\/(png|webp|gif);base64,/i.test(result.display))throw Error('잘못된 이미지');addDecoration({kind:'custom',src:result.display,name:file.name.slice(0,60)})}catch{alert('이미지를 읽지 못했어요. 다른 PNG, WebP 또는 GIF 파일을 시도해 주세요.')}
+    });
+    byId('personaDecoList').addEventListener('click',event=>{const button=event.target.closest('[data-select-deco]');if(button){selectedId=button.dataset.selectDeco;render()}});
+    for(const [control,key] of [['personaDecoSize','size'],['personaDecoRotate','rotate']]){
+      const input=byId(control);input.addEventListener('input',()=>{const item=selected();if(!item)return;item[key]=Number(input.value);byId(control+'Value').textContent=input.value+(key==='size'?'px':'°');const node=[...layer.children].find(el=>el.dataset.decoId===item.id);if(node)paintItem(node,item)});
+      input.addEventListener('change',()=>{if(selected())void saveChange()});
+    }
+    byId('personaDecoSway').addEventListener('change',event=>{const item=selected();if(!item)return;item.sway=event.target.checked;const node=[...layer.children].find(el=>el.dataset.decoId===item.id);if(node)paintItem(node,item);void saveChange()});
+    byId('personaDecoRemove').addEventListener('click',()=>{const list=editableItems(),index=list.findIndex(item=>item.id===selectedId);if(index<0)return;const removed=list.splice(index,1)[0];selectedId=null;render();void saveChange().then(ok=>{if(!ok){list.splice(index,0,removed);selectedId=removed.id;render()}})});
+    layer.addEventListener('pointerdown',event=>{
+      if(panel.hidden||bridge.isPublic()||event.button!==0)return;const node=event.target.closest('.personaDecoItem');if(!node)return;
+      const item=items().find(entry=>entry.id===node.dataset.decoId);if(!item)return;event.preventDefault();selectedId=item.id;
+      for(const child of layer.children)child.classList.toggle('selected',child===node);
+      const rect=node.getBoundingClientRect();dragging={id:item.id,oldX:item.x,oldY:item.y,offsetX:rect.left+rect.width/2-event.clientX,offsetY:rect.top+rect.height/2-event.clientY};node.classList.add('dragging');node.setPointerCapture(event.pointerId);
+      byId('personaDecoList').querySelectorAll('[data-select-deco]').forEach(button=>button.classList.toggle('selected',button.dataset.selectDeco===item.id));
+      byId('personaDecoSelected').hidden=false;byId('personaDecoSelectedName').textContent=item.name||'이미지';byId('personaDecoSize').value=item.size;byId('personaDecoSizeValue').textContent=item.size+'px';byId('personaDecoRotate').value=item.rotate;byId('personaDecoRotateValue').textContent=item.rotate+'°';byId('personaDecoSway').checked=item.sway!==false;
+    });
+    layer.addEventListener('pointermove',event=>{if(!dragging)return;const node=event.target.closest('.personaDecoItem');if(!node||node.dataset.decoId!==dragging.id)return;const item=selected();if(!item)return;const rect=layer.getBoundingClientRect();item.x=Math.round(clamp((event.clientX+dragging.offsetX-rect.left)/rect.width*100,0,100)*100)/100;item.y=Math.round(clamp(event.clientY+dragging.offsetY-page.getBoundingClientRect().top,0,Math.max(0,page.offsetHeight)));node.style.left=item.x+'%';node.style.top=item.y+'px'});
+    const finishDrag=event=>{if(!dragging)return;const node=event.target.closest('.personaDecoItem');if(!node||node.dataset.decoId!==dragging.id)return;node.classList.remove('dragging');const previous=dragging;dragging=null;const item=items().find(entry=>entry.id===previous.id);if(item&&(item.x!==previous.oldX||item.y!==previous.oldY))void saveChange().then(ok=>{if(!ok){item.x=previous.oldX;item.y=previous.oldY;render()}})};
+    layer.addEventListener('pointerup',finishDrag);layer.addEventListener('pointercancel',finishDrag);
+    document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!panel.hidden){panel.hidden=true;render()}});
+    document.addEventListener('prompt-atlas-state-changed',()=>{if(!dragging)render()});
+    window.addEventListener('resize',updateFit);
+    render();
+  }
+  if(window.promptAtlasReady)init();else document.addEventListener('prompt-atlas-ready',init,{once:true});
+})();
+</script>
 </body>
 </html>

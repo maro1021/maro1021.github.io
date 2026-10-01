@@ -1919,6 +1919,7 @@ body.public-view .publicBadge{display:inline-flex}body.public-view #settingsBtn,
 .personaDecoSelected{display:grid;gap:11px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}.personaDecoSelected[hidden]{display:none!important}.personaDecoSelected strong{font-size:12px}.personaDecoSelected label{display:grid;gap:4px;color:var(--muted);font-size:11px;font-weight:850}.personaDecoSelected label span{display:flex;justify-content:space-between}.personaDecoSelected input[type=range]{width:100%;accent-color:var(--accent)}.personaDecoSelected .personaDecoSwitch{display:flex;align-items:center;gap:7px}.personaDecoSelected .personaDecoSwitch input{accent-color:var(--accent)}.personaDecoSelected .btn{width:100%}
 .personaDecoInteractionOptions{display:grid;gap:7px;padding-top:10px;border-top:1px dashed var(--line)}.personaDecoInteractionOptions strong{color:var(--text)}.personaDecoInteractionPreview{display:flex;align-items:center;gap:9px;min-height:52px;color:var(--muted);font-size:11px;line-height:1.4}.personaDecoInteractionPreview img{width:52px;height:52px;object-fit:contain;border:1px solid var(--line);border-radius:10px;background:var(--panel)}.personaDecoInteractionPreview img[hidden]{display:none!important}.personaDecoSelected .personaDecoSwapUpload{margin:0}.personaDecoSelected .personaDecoSwapRemove{padding:7px;font-size:11px}.personaDecoSwapRemove[hidden]{display:none!important}.personaDecoSelected textarea{width:100%;min-height:83px;resize:vertical;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--text);font:inherit;font-weight:500;line-height:1.5}.personaDecoSelected textarea:focus-visible{outline:2px solid var(--accent)}.personaDecoSelected .personaDecoDialogueHint{font-size:10px;font-weight:500;line-height:1.5}
 .personaDecoReactionList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.personaDecoReactionCard{display:flex;align-items:stretch;min-width:0;border:1px solid var(--line);border-radius:11px;background:var(--panel);overflow:hidden}.personaDecoReactionCard.active{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 16%,transparent)}.personaDecoReactionCard>button:first-child{display:flex;align-items:center;gap:7px;flex:1;min-width:0;padding:7px;border:0;background:transparent;color:var(--text);font-size:11px;font-weight:800;text-align:left;cursor:pointer}.personaDecoReactionCard img{width:36px;height:36px;flex:none;object-fit:contain}.personaDecoReactionCard span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.personaDecoReactionCard .personaDecoReactionRemove{flex:none;width:27px;border:0;border-left:1px solid var(--line);background:transparent;color:var(--danger);font-size:17px;cursor:pointer}.personaDecoReactionHelp{font-size:10px;line-height:1.5;color:var(--muted)}
+.personaDecoDialogueList{display:grid;gap:6px}.personaDecoDialogueList:empty{display:none}.personaDecoDialogueRow{display:flex;align-items:center;gap:7px;min-width:0;padding:7px 8px;border:1px solid var(--line);border-radius:10px;background:var(--panel);font-size:11px}.personaDecoDialogueRow .personaDecoDialogueNumber{flex:none;color:var(--accent);font-weight:900}.personaDecoDialogueRow .personaDecoDialogueText{flex:1;min-width:0;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text)}.personaDecoDialogueRow button{flex:none;border:0;background:transparent;color:var(--accent);font-size:11px;font-weight:850;cursor:pointer}.personaDecoDialogueRow button:last-child{color:var(--danger);font-size:16px}.personaDecoDialogueCount{font-size:10px;color:var(--muted);font-weight:800}
 .personaDecoSelected .personaDecoAddDialogue{padding:7px;font-size:11px}
 .personaDecoMobileNote{display:none;font-size:11px;color:var(--muted);line-height:1.5;margin:0 0 8px}
 body.public-view #personaDecoOpen,body.public-view .personaDecoPanel{display:none!important}
@@ -2056,10 +2057,12 @@ html[data-theme="cosmos"] .sortWrap,html[data-theme="cosmos"] .sortWrap label{co
         <label class="personaDecoUpload personaDecoSwapUpload">＋ 반응 이미지 추가 (PNG · WebP · GIF)<input id="personaDecoInteractionFile" type="file" accept="image/png,image/webp,image/gif" multiple></label>
       </div>
       <label><span id="personaDecoDialogueTarget">선택한 이미지의 대사</span>
-        <textarea id="personaDecoDialogues" rows="4" placeholder="안녕!&#10;오늘도 놀러 왔구나 ♡"></textarea>
-        <span class="personaDecoDialogueHint">선택한 이미지의 대사를 한 줄에 하나씩 적어 주세요. 이미지와 그 이미지의 대사는 각각 랜덤으로 뽑혀요. 같은 이미지나 대사가 다시 나올 수도 있어요.</span>
+        <textarea id="personaDecoDialogues" rows="2" placeholder="대사를 입력하고 Enter 또는 아래 버튼을 눌러 주세요"></textarea>
+        <span class="personaDecoDialogueHint">대사를 여러 줄 붙여넣으면 한 줄씩 추가돼요. 이미지와 해당 이미지의 대사는 랜덤으로 뽑히며, 같은 대사가 다시 나올 수도 있어요.</span>
       </label>
       <button class="btn personaDecoAddDialogue" id="personaDecoAddDialogue" type="button">＋ 대사 추가</button>
+      <span class="personaDecoDialogueCount" id="personaDecoDialogueCount"></span>
+      <div class="personaDecoDialogueList" id="personaDecoDialogueList" aria-live="polite"></div>
       <button class="btn danger" id="personaDecoRemove" type="button">선택한 장식 삭제</button>
     </div>
   </aside>
@@ -3816,7 +3819,7 @@ bootApp();
   ];
   const sources=Object.fromEntries(stickers.map(s=>[s.key,'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(s.art)]));
   const byId=id=>document.getElementById(id),page=byId('atlasPagePersona'),layer=byId('personaDecoLayer'),panel=byId('personaDecoPanel');
-  let bridge,selectedId=null,selectedReactionId='base',reactionOwnerId=null,dragging=null,panelDragging=null,dialogueSaveTimer=null,dialogueDirty=false;
+  let bridge,selectedId=null,selectedReactionId='base',reactionOwnerId=null,editingDialogueIndex=-1,dialogueDraftOwner='',dragging=null,panelDragging=null;
   const interactionTimers=new Map();
   const maxReactionImages=6;
   const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
@@ -3855,8 +3858,20 @@ bootApp();
   }
   async function saveChange(){const okay=await bridge.save();if(!okay)alert('꾸미기 변경을 저장하지 못했어요. 브라우저 저장 공간을 확인해 주세요.');return okay}
   function paintItem(node,item){node.style.left=(Number(item.xPx)||0)+'px';node.style.top=Math.max(0,Number(item.y)||0)+'px';node.style.setProperty('--deco-size',clamp(Number(item.size)||150,48,320)+'px');node.style.setProperty('--deco-rotate',clamp(Number(item.rotate)||0,-30,30)+'deg');node.style.setProperty('--deco-duration',(3.4+(String(item.id).length%5)*.33)+'s');node.style.setProperty('--deco-delay',(-.25*(String(item.id).length%7))+'s');node.classList.toggle('noSway',item.sway===false)}
+  function renderDialogueRows(lines){
+    const list=byId('personaDecoDialogueList');list.replaceChildren();
+    byId('personaDecoDialogueCount').textContent=lines.length?`추가된 대사 ${lines.length}개`:'아직 추가된 대사가 없어요.';
+    lines.forEach((line,index)=>{
+      const row=document.createElement('div');row.className='personaDecoDialogueRow';
+      const number=document.createElement('span');number.className='personaDecoDialogueNumber';number.textContent=`${index+1}.`;
+      const content=document.createElement('span');content.className='personaDecoDialogueText';content.textContent=line;
+      const edit=document.createElement('button');edit.type='button';edit.dataset.dialogueEdit=index;edit.textContent='수정';edit.setAttribute('aria-label',`${index+1}번 대사 수정`);
+      const remove=document.createElement('button');remove.type='button';remove.dataset.dialogueRemove=index;remove.textContent='×';remove.setAttribute('aria-label',`${index+1}번 대사 삭제`);
+      row.append(number,content,edit,remove);list.appendChild(row);
+    });
+  }
   function syncSelectedControls(item){
-    byId('personaDecoSelected').hidden=!item;if(!item){reactionOwnerId=null;return}
+    byId('personaDecoSelected').hidden=!item;if(!item){reactionOwnerId=null;dialogueDraftOwner='';editingDialogueIndex=-1;return}
     byId('personaDecoSelectedName').textContent=item.name||'이미지';
     for(const [control,value,suffix] of [['personaDecoSize',clamp(Number(item.size)||150,48,320),'px'],['personaDecoRotate',clamp(Number(item.rotate)||0,-30,30),'°']]){byId(control).value=value;byId(control+'Value').textContent=value+suffix}
     byId('personaDecoSway').checked=item.sway!==false;
@@ -3876,7 +3891,10 @@ bootApp();
     const target=selectedReactionId==='base'?item:reactions.find(reaction=>reaction.id===selectedReactionId);
     byId('personaDecoDialogueTarget').textContent=selectedReactionId==='base'?(reactions.length?'기본 이미지의 대사 · 반응 이미지가 없을 때':'기본 이미지의 대사'):'선택한 반응 이미지의 대사';
     const input=byId('personaDecoDialogues');
-    if(document.activeElement!==input||input.dataset.itemId!==item.id||input.dataset.reactionId!==selectedReactionId)input.value=(selectedReactionId==='base'?baseDialogueLines(item):dialogueLines(target||{dialogues:[]})).join('\n');
+    const draftOwner=`${item.id}:${selectedReactionId}`;
+    if(dialogueDraftOwner!==draftOwner){dialogueDraftOwner=draftOwner;editingDialogueIndex=-1;input.value=''}
+    byId('personaDecoAddDialogue').textContent=editingDialogueIndex>=0?'✓ 대사 수정 저장':'＋ 대사 추가';
+    renderDialogueRows(selectedReactionId==='base'?baseDialogueLines(item):dialogueLines(target||{dialogues:[]}));
     input.dataset.itemId=item.id;input.dataset.reactionId=selectedReactionId;
   }
   function resetDecoration(node,item){
@@ -3907,7 +3925,6 @@ bootApp();
     },1700));
   }
   const activateDecoration=(node,item)=>showDecoration(node,item,{press:true});
-  function persistDialogues(){if(!dialogueDirty)return;dialogueDirty=false;clearTimeout(dialogueSaveTimer);dialogueSaveTimer=null;void saveChange()}
   function keepLegacyPositions(){let changed=false;for(const item of items())if(typeof item.xPx!=='number'||!Number.isFinite(item.xPx)){const x=Number(item.x);item.xPx=Math.round((Number.isFinite(x)?x:50)*window.innerWidth/100-pageLeft());changed=true}if(changed&&!bridge.isPublic())queueMicrotask(()=>{void bridge.save()})}
   function render(){
     if(!bridge)return;
@@ -4015,20 +4032,46 @@ bootApp();
       if(choice){selectedReactionId=choice.dataset.reactionSelect;syncSelectedControls(item)}
     });
     const dialogueInput=byId('personaDecoDialogues');
-    byId('personaDecoAddDialogue').addEventListener('click',()=>{
-      if(!selected())return;
-      if(dialogueInput.value.trim())dialogueInput.value=dialogueInput.value.trimEnd()+'\n';
-      dialogueInput.focus();dialogueInput.setSelectionRange(dialogueInput.value.length,dialogueInput.value.length);
+    const editableDialogueTarget=item=>dialogueInput.dataset.reactionId==='base'?(editableReactions(item),item):editableReactions(item).find(reaction=>reaction.id===dialogueInput.dataset.reactionId);
+    const commitDialogueDraft=async()=>{
+      const item=editableItems().find(entry=>entry.id===dialogueInput.dataset.itemId);
+      const additions=dialogueInput.value.split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
+      if(!item||!additions.length){dialogueInput.focus();return}
+      const previous=reactionSnapshot(item),previousDraft=dialogueInput.value,previousEditing=editingDialogueIndex;
+      const target=editableDialogueTarget(item);if(!target)return;
+      const original=target.dialogues,lines=dialogueLines(target);
+      if(previousEditing>=0&&previousEditing<lines.length)lines.splice(previousEditing,1,...additions);else lines.push(...additions);
+      target.dialogues=lines;dialogueInput.value='';editingDialogueIndex=-1;syncSelectedControls(item);
+      if(!await saveChange()){
+        target.dialogues=original;restoreReactionSnapshot(item,previous);
+        dialogueInput.value=previousDraft;editingDialogueIndex=previousEditing;syncSelectedControls(item);
+      }
+    };
+    byId('personaDecoAddDialogue').addEventListener('click',()=>{void commitDialogueDraft()});
+    dialogueInput.addEventListener('keydown',event=>{
+      if(event.key!=='Enter'||event.shiftKey||event.isComposing||event.keyCode===229)return;
+      event.preventDefault();void commitDialogueDraft();
     });
-    dialogueInput.addEventListener('input',()=>{
-      const item=editableItems().find(entry=>entry.id===dialogueInput.dataset.itemId);if(!item)return;
-      const reactionId=dialogueInput.dataset.reactionId;
-      const target=reactionId==='base'?(editableReactions(item),item):editableReactions(item).find(reaction=>reaction.id===reactionId);
-      if(!target)return;
-      target.dialogues=dialogueInput.value.split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
-      dialogueDirty=true;clearTimeout(dialogueSaveTimer);dialogueSaveTimer=setTimeout(persistDialogues,650);
+    byId('personaDecoDialogueList').addEventListener('click',async event=>{
+      const item=selected();if(!item)return;
+      const edit=event.target.closest('[data-dialogue-edit]');
+      if(edit){
+        const index=Number(edit.dataset.dialogueEdit),reaction=reactionImages(item).find(entry=>entry.id===selectedReactionId);
+        const lines=selectedReactionId==='base'?baseDialogueLines(item):dialogueLines(reaction||{dialogues:[]});
+        if(!Number.isInteger(index)||!lines[index])return;
+        editingDialogueIndex=index;dialogueInput.value=lines[index];byId('personaDecoAddDialogue').textContent='✓ 대사 수정 저장';dialogueInput.focus();return;
+      }
+      const remove=event.target.closest('[data-dialogue-remove]');if(!remove)return;
+      const index=Number(remove.dataset.dialogueRemove),previous=reactionSnapshot(item);
+      const target=editableDialogueTarget(item);if(!target)return;
+      const original=target.dialogues,lines=dialogueLines(target);
+      if(!Number.isInteger(index)||index<0||index>=lines.length)return;
+      lines.splice(index,1);target.dialogues=lines;
+      if(editingDialogueIndex===index){editingDialogueIndex=-1;dialogueInput.value=''}
+      else if(editingDialogueIndex>index)editingDialogueIndex--;
+      syncSelectedControls(item);
+      if(!await saveChange()){target.dialogues=original;restoreReactionSnapshot(item,previous);syncSelectedControls(item)}
     });
-    dialogueInput.addEventListener('change',persistDialogues);
     byId('personaDecoList').addEventListener('click',event=>{const button=event.target.closest('[data-select-deco]');if(button){selectedId=button.dataset.selectDeco;render()}});
     for(const [control,key] of [['personaDecoSize','size'],['personaDecoRotate','rotate']]){
       const input=byId(control);input.addEventListener('input',()=>{const item=selected();if(!item)return;item[key]=Number(input.value);byId(control+'Value').textContent=input.value+(key==='size'?'px':'°');const node=[...layer.children].find(el=>el.dataset.decoId===item.id);if(node)paintItem(node,item)});

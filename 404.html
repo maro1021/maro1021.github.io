@@ -1893,7 +1893,7 @@ body.public-view .publicBadge{display:inline-flex}body.public-view #settingsBtn,
 #atlasPagePersona{position:relative;isolation:isolate}
 .personaDecoLayer{position:absolute;top:0;left:0;width:100%;height:100%;z-index:6;pointer-events:none}
 .personaDecoItem{position:absolute;width:var(--deco-size);transform:translate(-50%,-50%) rotate(var(--deco-rotate));pointer-events:auto;cursor:pointer;user-select:none;-webkit-user-select:none;will-change:transform}
-.personaDecoArt{display:block;width:100%;height:auto;max-width:none;filter:drop-shadow(0 7px 10px rgba(72,61,91,.16));animation:personaDecoSway var(--deco-duration,3.8s) ease-in-out var(--deco-delay,0s) infinite alternate;transform-origin:50% 88%;-webkit-user-drag:none}
+.personaDecoArt{display:block;width:100%;height:100%;max-width:none;object-fit:contain;filter:drop-shadow(0 7px 10px rgba(72,61,91,.16));animation:personaDecoSway var(--deco-duration,3.8s) ease-in-out var(--deco-delay,0s) infinite alternate;transform-origin:50% 88%;-webkit-user-drag:none}
 .personaDecoItem.noSway .personaDecoArt{animation:none}
 .personaDecoItem.hovering:not(.interacting) .personaDecoArt{animation:none;transform:translateY(-3px) scale(1.025)}
 @keyframes personaDecoSway{from{transform:translate(-2px,1px) rotate(-4deg)}to{transform:translate(3px,-6px) rotate(4deg)}}
@@ -1918,6 +1918,7 @@ body.public-view .publicBadge{display:inline-flex}body.public-view #settingsBtn,
 .personaDecoList{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}.personaDecoList button{display:flex;align-items:center;gap:4px;padding:5px 8px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--muted);font-size:11px;max-width:140px}.personaDecoList button.selected{border-color:var(--accent);color:var(--accent)}.personaDecoList img{width:24px;height:24px;object-fit:contain}.personaDecoList span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .personaDecoSelected{display:grid;gap:11px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}.personaDecoSelected[hidden]{display:none!important}.personaDecoSelected strong{font-size:12px}.personaDecoSelected label{display:grid;gap:4px;color:var(--muted);font-size:11px;font-weight:850}.personaDecoSelected label span{display:flex;justify-content:space-between}.personaDecoSelected input[type=range]{width:100%;accent-color:var(--accent)}.personaDecoSelected .personaDecoSwitch{display:flex;align-items:center;gap:7px}.personaDecoSelected .personaDecoSwitch input{accent-color:var(--accent)}.personaDecoSelected .btn{width:100%}
 .personaDecoInteractionOptions{display:grid;gap:7px;padding-top:10px;border-top:1px dashed var(--line)}.personaDecoInteractionOptions strong{color:var(--text)}.personaDecoInteractionPreview{display:flex;align-items:center;gap:9px;min-height:52px;color:var(--muted);font-size:11px;line-height:1.4}.personaDecoInteractionPreview img{width:52px;height:52px;object-fit:contain;border:1px solid var(--line);border-radius:10px;background:var(--panel)}.personaDecoInteractionPreview img[hidden]{display:none!important}.personaDecoSelected .personaDecoSwapUpload{margin:0}.personaDecoSelected .personaDecoSwapRemove{padding:7px;font-size:11px}.personaDecoSwapRemove[hidden]{display:none!important}.personaDecoSelected textarea{width:100%;min-height:83px;resize:vertical;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--text);font:inherit;font-weight:500;line-height:1.5}.personaDecoSelected textarea:focus-visible{outline:2px solid var(--accent)}.personaDecoSelected .personaDecoDialogueHint{font-size:10px;font-weight:500;line-height:1.5}
+.personaDecoReactionList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.personaDecoReactionCard{display:flex;align-items:stretch;min-width:0;border:1px solid var(--line);border-radius:11px;background:var(--panel);overflow:hidden}.personaDecoReactionCard.active{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 16%,transparent)}.personaDecoReactionCard>button:first-child{display:flex;align-items:center;gap:7px;flex:1;min-width:0;padding:7px;border:0;background:transparent;color:var(--text);font-size:11px;font-weight:800;text-align:left;cursor:pointer}.personaDecoReactionCard img{width:36px;height:36px;flex:none;object-fit:contain}.personaDecoReactionCard span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.personaDecoReactionCard .personaDecoReactionRemove{flex:none;width:27px;border:0;border-left:1px solid var(--line);background:transparent;color:var(--danger);font-size:17px;cursor:pointer}.personaDecoReactionHelp{font-size:10px;line-height:1.5;color:var(--muted)}
 .personaDecoSelected .personaDecoAddDialogue{padding:7px;font-size:11px}
 .personaDecoMobileNote{display:none;font-size:11px;color:var(--muted);line-height:1.5;margin:0 0 8px}
 body.public-view #personaDecoOpen,body.public-view .personaDecoPanel{display:none!important}
@@ -2038,7 +2039,7 @@ html[data-theme="cosmos"] .sortWrap,html[data-theme="cosmos"] .sortWrap label{co
   <div class="personaDecoLayer" id="personaDecoLayer" aria-label="페이지 장식"></div>
   <aside class="personaDecoPanel" id="personaDecoPanel" aria-label="페이지 꾸미기" hidden>
     <div class="personaDecoPanelHead" id="personaDecoPanelHead"><h3>✦ 여백 꾸미기 · 잡고 이동</h3><button id="personaDecoClose" type="button" aria-label="꾸미기 닫기">×</button></div>
-    <p class="personaDecoHint">제목줄을 잡아 창을 옮기고, 창 안을 스크롤해 아래 설정을 볼 수 있어요. 장식에 마우스를 올리거나 누르면 이미지와 대사가 바뀌어요. 위치와 움직임은 공유본에도 보여요.</p>
+    <p class="personaDecoHint">제목줄을 잡아 창을 옮기고, 창 안을 스크롤해 아래 설정을 볼 수 있어요. 반응 이미지마다 대사를 따로 적으면, 마우스를 올리거나 누를 때 이미지와 해당 대사가 랜덤으로 나와요.</p>
     <p class="personaDecoMobileNote">화면이 좁으면 바깥쪽 장식이 화면 밖에 있을 수 있어요. 넓은 화면에서 배치한 위치는 유지됩니다.</p>
     <div class="personaStickerShelf" id="personaStickerShelf"></div>
     <label class="personaDecoUpload">＋ 투명 이미지 올리기 (PNG · WebP · GIF)<input id="personaDecoFile" type="file" accept="image/png,image/webp,image/gif"></label>
@@ -2049,14 +2050,14 @@ html[data-theme="cosmos"] .sortWrap,html[data-theme="cosmos"] .sortWrap label{co
       <label><span>기울기 <output id="personaDecoRotateValue"></output></span><input id="personaDecoRotate" type="range" min="-30" max="30" step="1"></label>
       <label class="personaDecoSwitch"><input id="personaDecoSway" type="checkbox" checked> 살랑살랑 흔들기</label>
       <div class="personaDecoInteractionOptions">
-        <strong>마우스를 올리거나 눌렀을 때 모습 · 선택사항</strong>
-        <div class="personaDecoInteractionPreview"><img id="personaDecoSwapPreview" alt="반응 이미지 미리보기" hidden><span id="personaDecoSwapHint">이미지가 없으면 원래 모습으로 반응해요.</span></div>
-        <label class="personaDecoUpload personaDecoSwapUpload">＋ 반응 이미지 선택 (PNG · WebP · GIF)<input id="personaDecoInteractionFile" type="file" accept="image/png,image/webp,image/gif"></label>
-        <button class="btn personaDecoSwapRemove" id="personaDecoSwapRemove" type="button" hidden>반응 이미지 지우기</button>
+        <strong>기본 모습과 랜덤 반응 이미지</strong>
+        <div class="personaDecoReactionList" id="personaDecoReactionList"></div>
+        <span class="personaDecoReactionHelp">기본 이미지는 평소에 보여요. 반응 이미지를 고르면 그 이미지에 연결된 대사만 나와요. 최대 6장, 각 2MB 이하예요.</span>
+        <label class="personaDecoUpload personaDecoSwapUpload">＋ 반응 이미지 추가 (PNG · WebP · GIF)<input id="personaDecoInteractionFile" type="file" accept="image/png,image/webp,image/gif" multiple></label>
       </div>
-      <label>마우스를 올리거나 누르면 나올 대사
+      <label><span id="personaDecoDialogueTarget">선택한 이미지의 대사</span>
         <textarea id="personaDecoDialogues" rows="4" placeholder="안녕!&#10;오늘도 놀러 왔구나 ♡"></textarea>
-        <span class="personaDecoDialogueHint">한 줄에 하나씩 여러 대사를 추가해 주세요. 마우스를 올리거나 누를 때마다 랜덤으로 한 가지가 나오며, 같은 대사가 다시 나올 수도 있어요.</span>
+        <span class="personaDecoDialogueHint">선택한 이미지의 대사를 한 줄에 하나씩 적어 주세요. 이미지와 그 이미지의 대사는 각각 랜덤으로 뽑혀요. 같은 이미지나 대사가 다시 나올 수도 있어요.</span>
       </label>
       <button class="btn personaDecoAddDialogue" id="personaDecoAddDialogue" type="button">＋ 대사 추가</button>
       <button class="btn danger" id="personaDecoRemove" type="button">선택한 장식 삭제</button>
@@ -2537,7 +2538,7 @@ async function makePublicPreview(snapshot){
  // Tiny decorations can appear with the instant preview; large uploaded images wait for the full share.
  preview.sitePages.personaDecorations=[];
  for(const decoration of snapshot.sitePages?.personaDecorations||[]){
-  const copy={...decoration,interactionSrc:''};if(copy.kind==='custom'&&String(copy.src||'').length>50000)continue;
+  const copy={...decoration,interactionSrc:'',reactions:[],dialogues:[]};if(copy.kind==='custom'&&String(copy.src||'').length>50000)continue;
   const added=JSON.stringify(copy).length;if(size+added>limit)continue;
   preview.sitePages.personaDecorations.push(copy);size+=added;
  }
@@ -3815,8 +3816,9 @@ bootApp();
   ];
   const sources=Object.fromEntries(stickers.map(s=>[s.key,'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(s.art)]));
   const byId=id=>document.getElementById(id),page=byId('atlasPagePersona'),layer=byId('personaDecoLayer'),panel=byId('personaDecoPanel');
-  let bridge,selectedId=null,dragging=null,panelDragging=null,dialogueSaveTimer=null,dialogueDirty=false;
+  let bridge,selectedId=null,selectedReactionId='base',reactionOwnerId=null,dragging=null,panelDragging=null,dialogueSaveTimer=null,dialogueDirty=false;
   const interactionTimers=new Map();
+  const maxReactionImages=6;
   const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
   const panelPositionKey='promptAtlasDecorationPanelPositionV1';
   let panelPosition=null;
@@ -3824,8 +3826,19 @@ bootApp();
   const items=()=>Array.isArray(bridge?.getState()?.sitePages?.personaDecorations)?bridge.getState().sitePages.personaDecorations:[];
   const editableItems=()=>{const state=bridge.getState();state.sitePages=state.sitePages||{};return state.sitePages.personaDecorations=Array.isArray(state.sitePages.personaDecorations)?state.sitePages.personaDecorations:[]};
   const sourceFor=item=>item.kind==='builtin'?sources[item.sticker]||'':/^data:image\/(png|webp|gif);base64,/i.test(String(item.src||''))?item.src:'';
-  const interactionSourceFor=item=>/^data:image\/(png|webp|gif);base64,/i.test(String(item.interactionSrc||''))?item.interactionSrc:'';
+  const validReactionSource=src=>/^data:image\/(png|webp|gif);base64,/i.test(String(src||''));
+  const legacyReactionSourceFor=item=>validReactionSource(item.interactionSrc)?item.interactionSrc:'';
   const dialogueLines=item=>Array.isArray(item.dialogues)?item.dialogues.map(line=>String(line).trim()).filter(Boolean):[];
+  const reactionImages=item=>Array.isArray(item.reactions)?item.reactions.filter(reaction=>validReactionSource(reaction?.src)):legacyReactionSourceFor(item)?[{id:'legacy',src:item.interactionSrc,name:'기존 반응 이미지',dialogues:dialogueLines(item)}]:[];
+  const baseDialogueLines=item=>!Array.isArray(item.reactions)&&legacyReactionSourceFor(item)?[]:dialogueLines(item);
+  function editableReactions(item){
+    if(!Array.isArray(item.reactions)){
+      const old=legacyReactionSourceFor(item);
+      item.reactions=old?[{id:'legacy',src:old,name:'기존 반응 이미지',dialogues:dialogueLines(item)}]:[];
+      if(old){item.dialogues=[];delete item.interactionSrc}
+    }
+    return item.reactions;
+  }
   const selected=()=>items().find(item=>item.id===selectedId);
   const pageLeft=()=>{const rect=page.getBoundingClientRect();if(rect.width)return rect.left;const app=page.closest('.app'),style=getComputedStyle(app);return app.getBoundingClientRect().left+(parseFloat(style.paddingLeft)||0)};
   function placePanel(x,y){
@@ -3843,16 +3856,28 @@ bootApp();
   async function saveChange(){const okay=await bridge.save();if(!okay)alert('꾸미기 변경을 저장하지 못했어요. 브라우저 저장 공간을 확인해 주세요.');return okay}
   function paintItem(node,item){node.style.left=(Number(item.xPx)||0)+'px';node.style.top=Math.max(0,Number(item.y)||0)+'px';node.style.setProperty('--deco-size',clamp(Number(item.size)||150,48,320)+'px');node.style.setProperty('--deco-rotate',clamp(Number(item.rotate)||0,-30,30)+'deg');node.style.setProperty('--deco-duration',(3.4+(String(item.id).length%5)*.33)+'s');node.style.setProperty('--deco-delay',(-.25*(String(item.id).length%7))+'s');node.classList.toggle('noSway',item.sway===false)}
   function syncSelectedControls(item){
-    byId('personaDecoSelected').hidden=!item;if(!item)return;
+    byId('personaDecoSelected').hidden=!item;if(!item){reactionOwnerId=null;return}
     byId('personaDecoSelectedName').textContent=item.name||'이미지';
     for(const [control,value,suffix] of [['personaDecoSize',clamp(Number(item.size)||150,48,320),'px'],['personaDecoRotate',clamp(Number(item.rotate)||0,-30,30),'°']]){byId(control).value=value;byId(control+'Value').textContent=value+suffix}
     byId('personaDecoSway').checked=item.sway!==false;
-    const swap=interactionSourceFor(item),preview=byId('personaDecoSwapPreview');preview.hidden=!swap;preview.src=swap||'';
-    byId('personaDecoSwapHint').textContent=swap?'마우스를 올리거나 누르면 이 모습으로 바뀌어요.':'이미지가 없으면 원래 모습으로 반응해요.';
-    byId('personaDecoSwapRemove').hidden=!swap;
+    const reactions=reactionImages(item);
+    if(reactionOwnerId!==item.id){reactionOwnerId=item.id;selectedReactionId=reactions[0]?.id||'base'}
+    if(selectedReactionId!=='base'&&!reactions.some(reaction=>reaction.id===selectedReactionId))selectedReactionId='base';
+    const choices=byId('personaDecoReactionList');choices.replaceChildren();
+    const addChoice=(id,src,label,removable)=>{
+      const card=document.createElement('div');card.className='personaDecoReactionCard';card.classList.toggle('active',selectedReactionId===id);
+      const button=document.createElement('button');button.type='button';button.dataset.reactionSelect=id;button.setAttribute('aria-pressed',String(selectedReactionId===id));
+      const image=document.createElement('img');image.src=src;image.alt='';const title=document.createElement('span');title.textContent=label;button.append(image,title);card.appendChild(button);
+      if(removable){const remove=document.createElement('button');remove.type='button';remove.className='personaDecoReactionRemove';remove.dataset.reactionRemove=id;remove.setAttribute('aria-label',label+' 삭제');remove.textContent='×';card.appendChild(remove)}
+      choices.appendChild(card);
+    };
+    addChoice('base',sourceFor(item),'기본 이미지',false);
+    reactions.forEach((reaction,index)=>addChoice(reaction.id,reaction.src,reaction.name||`반응 ${index+1}`,true));
+    const target=selectedReactionId==='base'?item:reactions.find(reaction=>reaction.id===selectedReactionId);
+    byId('personaDecoDialogueTarget').textContent=selectedReactionId==='base'?(reactions.length?'기본 이미지의 대사 · 반응 이미지가 없을 때':'기본 이미지의 대사'):'선택한 반응 이미지의 대사';
     const input=byId('personaDecoDialogues');
-    if(document.activeElement!==input||input.dataset.itemId!==item.id)input.value=dialogueLines(item).join('\n');
-    input.dataset.itemId=item.id;
+    if(document.activeElement!==input||input.dataset.itemId!==item.id||input.dataset.reactionId!==selectedReactionId)input.value=(selectedReactionId==='base'?baseDialogueLines(item):dialogueLines(target||{dialogues:[]})).join('\n');
+    input.dataset.itemId=item.id;input.dataset.reactionId=selectedReactionId;
   }
   function resetDecoration(node,item){
     clearTimeout(interactionTimers.get(item.id));interactionTimers.delete(item.id);
@@ -3861,13 +3886,13 @@ bootApp();
     const image=node.querySelector('.personaDecoArt');if(image)image.src=sourceFor(item);
   }
   function showDecoration(node,item,{hover=false,press=false}={}){
-    const image=node.querySelector('.personaDecoArt'),original=sourceFor(item),swap=interactionSourceFor(item);
+    const image=node.querySelector('.personaDecoArt'),original=sourceFor(item),reactions=reactionImages(item),reaction=reactions.length?reactions[Math.floor(Math.random()*reactions.length)]:null;
     clearTimeout(interactionTimers.get(item.id));interactionTimers.delete(item.id);
     node.querySelector('.personaDecoBubble')?.remove();node.classList.remove('interacting');
     if(hover)node.classList.add('hovering');
-    image.src=swap||original;
+    image.src=reaction?.src||original;
     if(press){void image.offsetWidth;node.classList.add('interacting')}
-    const lines=dialogueLines(item);
+    const lines=reaction?dialogueLines(reaction):baseDialogueLines(item);
     if(lines.length){
       const index=Math.floor(Math.random()*lines.length);
       const bubble=document.createElement('span');bubble.className='personaDecoBubble';bubble.textContent=lines[index%lines.length];bubble.setAttribute('role','status');
@@ -3897,7 +3922,9 @@ bootApp();
     for(const item of items()){
       const src=sourceFor(item);if(!src)continue;
       const node=document.createElement('div');node.className='personaDecoItem';node.dataset.decoId=item.id;node.classList.toggle('selected',item.id===selectedId);node.setAttribute('role','button');node.setAttribute('aria-label',(item.name||'장식')+' · 눌러서 반응 보기');node.tabIndex=0;
-      const image=document.createElement('img');image.className='personaDecoArt';image.src=src;image.alt='';image.draggable=false;node.appendChild(image);paintItem(node,item);layer.appendChild(node);
+      const image=document.createElement('img');image.className='personaDecoArt';image.alt='';image.draggable=false;
+      image.addEventListener('load',()=>{if(image.src===src&&image.naturalWidth&&image.naturalHeight&&!node.dataset.baseRatio){node.style.aspectRatio=`${image.naturalWidth}/${image.naturalHeight}`;node.dataset.baseRatio='1'}});
+      image.src=src;node.appendChild(image);paintItem(node,item);layer.appendChild(node);
       node.addEventListener('pointerenter',event=>{if(event.pointerType==='mouse'&&!dragging)showDecoration(node,item,{hover:true})});
       node.addEventListener('pointerleave',event=>{if(event.pointerType!=='mouse')return;node.classList.remove('hovering');if(!node.classList.contains('interacting'))resetDecoration(node,item)});
     }
@@ -3944,20 +3971,48 @@ bootApp();
       if(items().filter(item=>item.kind==='custom').length>=6){alert('올린 이미지는 6장까지 추가할 수 있어요.');return}
       try{const result=await bridge.prepareImage(file);if(!/^data:image\/(png|webp|gif);base64,/i.test(result.display))throw Error('잘못된 이미지');addDecoration({kind:'custom',src:result.display,name:file.name.slice(0,60)})}catch{alert('이미지를 읽지 못했어요. 다른 PNG, WebP 또는 GIF 파일을 시도해 주세요.')}
     });
+    const reactionSnapshot=item=>({reactions:item.reactions,dialogues:item.dialogues,interactionSrc:item.interactionSrc,hadReactions:Object.hasOwn(item,'reactions'),hadLegacy:Object.hasOwn(item,'interactionSrc')});
+    const restoreReactionSnapshot=(item,previous)=>{
+      if(previous.hadReactions)item.reactions=previous.reactions;else delete item.reactions;
+      if(previous.hadLegacy)item.interactionSrc=previous.interactionSrc;else delete item.interactionSrc;
+      item.dialogues=previous.dialogues;
+    };
     byId('personaDecoInteractionFile').addEventListener('change',async event=>{
-      const file=event.target.files?.[0],itemId=selectedId;event.target.value='';if(!file||!itemId)return;
-      if(!['image/png','image/webp','image/gif'].includes(file.type)){alert('PNG, WebP 또는 GIF 파일을 선택해 주세요.');return}
-      if(file.size>2*1024*1024){alert('공유본 용량을 위해 반응 이미지는 2MB 이하로 골라 주세요. 화질은 변경하지 않아요.');return}
+      const input=event.target,files=[...(input.files||[])],itemId=selectedId;input.value='';if(!files.length||!itemId)return;
+      const item=editableItems().find(entry=>entry.id===itemId);if(!item)return;
+      const available=maxReactionImages-reactionImages(item).length;
+      if(available<=0){alert('반응 이미지는 장식마다 6장까지 추가할 수 있어요.');return}
+      if(files.length>available)alert(`빈자리가 ${available}장이라 앞의 ${available}장만 추가할게요.`);
+      input.disabled=true;const additions=[];
       try{
-        const result=await bridge.prepareImage(file);if(!/^data:image\/(png|webp|gif);base64,/i.test(result.display))throw Error('잘못된 이미지');
-        const item=editableItems().find(entry=>entry.id===itemId);if(!item)return;
-        const previous=item.interactionSrc;item.interactionSrc=result.display;render();
-        if(!await saveChange()){item.interactionSrc=previous;render()}
-      }catch{alert('반응 이미지를 읽지 못했어요. 다른 PNG, WebP 또는 GIF 파일을 시도해 주세요.')}
+        for(const file of files.slice(0,available)){
+          if(!['image/png','image/webp','image/gif'].includes(file.type)){alert(`${file.name}: PNG, WebP 또는 GIF 이미지만 추가할 수 있어요.`);continue}
+          if(file.size>2*1024*1024){alert(`${file.name}: 반응 이미지 한 장은 2MB 이하로 골라 주세요. 화질은 변경하지 않아요.`);continue}
+          try{
+            const result=await bridge.prepareImage(file);
+            if(!validReactionSource(result.display))throw Error('잘못된 이미지');
+            additions.push({id:'reaction-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8),src:result.display,name:file.name.slice(0,60),dialogues:[]});
+          }catch{alert(`${file.name}: 이미지를 읽지 못했어요. 다른 파일을 시도해 주세요.`)}
+        }
+      }finally{input.disabled=false}
+      if(!additions.length)return;
+      const previous=reactionSnapshot(item),previousSelection=selectedReactionId;
+      item.reactions=[...editableReactions(item),...additions];
+      selectedReactionId=additions[additions.length-1].id;reactionOwnerId=item.id;render();
+      if(!await saveChange()){restoreReactionSnapshot(item,previous);selectedReactionId=previousSelection;render()}
     });
-    byId('personaDecoSwapRemove').addEventListener('click',async()=>{
-      const item=selected();if(!item)return;const previous=item.interactionSrc;item.interactionSrc='';render();
-      if(!await saveChange()){item.interactionSrc=previous;render()}
+    byId('personaDecoReactionList').addEventListener('click',async event=>{
+      const item=selected();if(!item)return;
+      const remove=event.target.closest('[data-reaction-remove]');
+      if(remove){
+        const previous=reactionSnapshot(item),previousSelection=selectedReactionId,id=remove.dataset.reactionRemove;
+        item.reactions=editableReactions(item).filter(reaction=>reaction.id!==id);
+        selectedReactionId='base';render();
+        if(!await saveChange()){restoreReactionSnapshot(item,previous);selectedReactionId=previousSelection;render()}
+        return;
+      }
+      const choice=event.target.closest('[data-reaction-select]');
+      if(choice){selectedReactionId=choice.dataset.reactionSelect;syncSelectedControls(item)}
     });
     const dialogueInput=byId('personaDecoDialogues');
     byId('personaDecoAddDialogue').addEventListener('click',()=>{
@@ -3967,7 +4022,10 @@ bootApp();
     });
     dialogueInput.addEventListener('input',()=>{
       const item=editableItems().find(entry=>entry.id===dialogueInput.dataset.itemId);if(!item)return;
-      item.dialogues=dialogueInput.value.split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
+      const reactionId=dialogueInput.dataset.reactionId;
+      const target=reactionId==='base'?(editableReactions(item),item):editableReactions(item).find(reaction=>reaction.id===reactionId);
+      if(!target)return;
+      target.dialogues=dialogueInput.value.split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
       dialogueDirty=true;clearTimeout(dialogueSaveTimer);dialogueSaveTimer=setTimeout(persistDialogues,650);
     });
     dialogueInput.addEventListener('change',persistDialogues);

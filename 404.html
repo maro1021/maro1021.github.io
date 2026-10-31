@@ -2536,9 +2536,9 @@ async function unpackChunkedShare(manifest,capturePacked){
  const descriptors=manifest.chunks;
  if(!Array.isArray(descriptors)||!descriptors.length||descriptors.length>2000||!Number.isSafeInteger(manifest.totalLength)||manifest.totalLength>350000000||!['gzip-base64','json'].includes(manifest.encoding))throw new Error('공유본의 저장 정보가 올바르지 않아요.');
  const parts=new Array(descriptors.length);
- await shareLimited(descriptors,8,async(d,index)=>{
+ await shareLimited(descriptors,3,async(d,index)=>{
   if(!slugOkay(d?.slug)||!Number.isSafeInteger(d.length)||d.length<1||d.length>SHARE_CHUNK_SIZE||typeof d.hash!=='string')throw new Error('공유본 조각 정보가 손상됐어요.');
-  const chunk=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:d.slug}));
+  let chunk;for(let attempt=0;attempt<3;attempt++){try{chunk=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:d.slug}));break}catch(error){if(attempt===2)throw error;await new Promise(resolve=>setTimeout(resolve,500*(attempt+1)))}}
   if(chunk?.__paFormat!==SHARE_PART_FORMAT||chunk.__paRevision!==manifest.__paRevision||chunk.index!==index||typeof chunk.data!=='string'||chunk.data.length!==d.length||shareChunkHash(chunk.data)!==d.hash)throw new Error('공유본을 완전히 읽지 못했어요. 잠시 후 다시 열어 주세요.');
   parts[index]=chunk.data;
  });
@@ -2636,6 +2636,12 @@ function publicError(message){const grid=document.getElementById('grid');if(grid
 function applyPublicSnapshot(payload){if(!payload||!Array.isArray(payload.characters))throw new Error('공개된 도감이 없어요.');invalidateGridCache();state=migrateState(payload);state.genres=(state.genres||[]).map(g=>({...g,viewLocked:false,viewPasswordHash:''}))}
 function publicShareRemoved(){document.documentElement.classList.add('public-booting');const screen=document.getElementById('publicBootScreen');screen.innerHTML='<div class="publicBootCard"><strong>공유가 해제되었어요.</strong><span>이 주소의 공개 도감을 더 이상 볼 수 없어요.</span></div>'}
 let publicPreviewPending=false,publicPreviewLoading=false,publicPreviewManifest=null,pendingPreviewOpen=null;
+function previewDetailStatus(message,failed=false){
+ const body=$('#detailBody');if(!body||!$('#detailOverlay')?.classList.contains('open'))return;
+ let status=body.querySelector('#previewDetailStatus');if(!status){status=document.createElement('div');status.id='previewDetailStatus';status.className='publicLoadState';status.style.cssText='margin:12px 16px;position:relative;z-index:2';body.prepend(status)}
+ status.textContent=message;
+ if(failed){const retry=document.createElement('button');retry.className='btn small';retry.textContent='다시 불러오기';retry.style.marginLeft='10px';retry.onclick=()=>{if(publicPreviewManifest){previewDetailStatus('상세 내용을 다시 불러오는 중이에요…');void hydratePublicShare(publicPreviewManifest)}};status.appendChild(retry)}
+}
 function showPublicPreview(manifest){
  if(!manifest?.preview||!Array.isArray(manifest.preview.characters))return false;
  if($('#detailOverlay')?.classList.contains('open'))closeOverlay('detailOverlay',true);
@@ -2646,13 +2652,15 @@ async function hydratePublicShare(manifest,announce=false){
  try{
   let packed=manifest;const payload=await unpackSharePayload(manifest,p=>{packed=p});if(!payload||!Array.isArray(payload.characters))throw new Error('공유본 확인 실패');
   if(publicPreviewManifest!==manifest)return;
-  publicPreviewPending=false;publicPreviewManifest=null;applyPublicSnapshot(payload);renderAll();document.dispatchEvent(new Event('prompt-atlas-state-changed'));
-  void writePublicShareCache(requestedShareSlug,packed).catch(()=>{});
   const waiting=pendingPreviewOpen;pendingPreviewOpen=null;
-  if(waiting?.kind==='character')void openDetail(waiting.id);
+  publicPreviewPending=false;publicPreviewManifest=null;applyPublicSnapshot(payload);
+  if(waiting?.kind==='character'&&$('#detailOverlay')?.classList.contains('open')&&activeDetail===waiting.id){renderDetail()}
+  else if(waiting?.kind==='character')void openDetail(waiting.id);
   else if(waiting?.kind==='log'){const item=[...document.querySelectorAll('[data-log-open]')].find(el=>el.dataset.logOpen===waiting.id);item?.click()}
+  setTimeout(()=>{renderAll();document.dispatchEvent(new Event('prompt-atlas-state-changed'))},0);
+  void writePublicShareCache(requestedShareSlug,packed).catch(()=>{});
   if(announce)toast('공유본의 새 내용을 불러왔어요');
- }catch(e){if(publicPreviewManifest===manifest)toast('상세 내용을 불러오지 못했어요. 눌러서 다시 시도해 주세요.')}
+ }catch(e){if(publicPreviewManifest===manifest){previewDetailStatus('상세 내용을 불러오지 못했어요. 연결을 확인하고 다시 시도해 주세요.',true);toast('상세 내용을 불러오지 못했어요. 다시 시도해 주세요.')}}
  finally{publicPreviewLoading=false;if(publicPreviewPending&&publicPreviewManifest&&publicPreviewManifest!==manifest)void hydratePublicShare(publicPreviewManifest)}
 }
 document.addEventListener('click',event=>{
@@ -2660,7 +2668,8 @@ document.addEventListener('click',event=>{
  const log=event.target.closest('[data-log-open]'),featured=event.target.closest('[data-featured-character]');
  if(!log&&!featured)return;
  event.preventDefault();event.stopImmediatePropagation();pendingPreviewOpen=log?{kind:'log',id:log.dataset.logOpen}:{kind:'character',id:featured.dataset.featuredCharacter};
- toast('상세 내용을 준비하고 있어요');if(!publicPreviewLoading&&publicPreviewManifest)void hydratePublicShare(publicPreviewManifest);
+ if(log)toast('상세 내용을 준비하고 있어요');else void openDetail(featured.dataset.featuredCharacter);
+ if(!publicPreviewLoading&&publicPreviewManifest)void hydratePublicShare(publicPreviewManifest);
 },true);
 document.addEventListener('keydown',event=>{
  if(!publicMode||!publicPreviewPending||!['Enter',' '].includes(event.key))return;
@@ -2755,7 +2764,7 @@ function openOverlay(id){$('#'+id).classList.add('open');document.body.style.ove
 function clearPublicCharacterSecret(id){if(!publicMode)return;const ch=state.characters.find(c=>c.id===id);if(!ch?.__protectedV2)return;ch.partner='';ch.partnerImage='';ch.partnerImages=[];ch.chapters=[];ch.youtubeLinks=[];ch.anniversaryDate='';ch.anniversaryEnabled=false}
 function closeOverlay(id,preservePrivate=false){
  const overlay=$('#'+id);if(!overlay)return;overlay.classList.remove('open');
- if(id==='detailOverlay'){detailTurnToken++;detailTurnBusy=false;overlay.querySelector('.detailTurnStage')?.remove();clearInterval(privateLockCountdownTimer);closePartnerReveal()}
+ if(id==='detailOverlay'){if(publicPreviewPending&&pendingPreviewOpen?.kind==='character')pendingPreviewOpen=null;detailTurnToken++;detailTurnBusy=false;overlay.querySelector('.detailTurnStage')?.remove();clearInterval(privateLockCountdownTimer);closePartnerReveal()}
  if(!preservePrivate&&id==='detailOverlay'&&activeDetail){const wasUnlocked=sessionPrivateUnlocks.delete(activeDetail);clearPublicCharacterSecret(activeDetail);if(wasUnlocked)updateVisibleCard(state.characters.find(c=>c.id===activeDetail))}
  if(!preservePrivate&&id==='editorOverlay'&&editDraft?.id){const wasUnlocked=sessionPrivateUnlocks.delete(editDraft.id);if(wasUnlocked)updateVisibleCard(state.characters.find(c=>c.id===editDraft.id))}
  if(!$('.overlay.open'))document.body.style.overflow=''
@@ -2937,7 +2946,7 @@ function playBookOpening(ch){
  stage.appendChild(book);modal.appendChild(stage);void stage.offsetWidth;ov.classList.add('book-opening');
  setTimeout(()=>{stage.remove();ov.classList.remove('book-opening')},2720)
 }
-async function openDetail(id){if(publicMode&&publicPreviewPending){pendingPreviewOpen={kind:'character',id};toast('상세 내용을 준비하고 있어요');if(!publicPreviewLoading&&publicPreviewManifest)void hydratePublicShare(publicPreviewManifest);return}const ch=state.characters.find(c=>c.id===id);if(!ch)return;const g=genreDef(ch.genre);if(g?.viewLocked&&!canViewGenre(g)&&!(await ensureGenreViewAccess(g)))return;if(activeDetail&&activeDetail!==id){sessionPrivateUnlocks.delete(activeDetail);clearPublicCharacterSecret(activeDetail)}sessionPrivateUnlocks.delete(id);clearPublicCharacterSecret(id);closePartnerReveal();activeDetail=id;activeDetailChapter=null;renderDetail();openOverlay('detailOverlay');playBookOpening(ch)}
+async function openDetail(id){if(publicMode&&publicPreviewPending){const preview=state.characters.find(c=>c.id===id);if(!preview)return;pendingPreviewOpen={kind:'character',id};activeDetail=id;activeDetailChapter=null;closePartnerReveal();renderDetail();openOverlay('detailOverlay');previewDetailStatus('상세 내용을 불러오는 중이에요…');if(!publicPreviewLoading&&publicPreviewManifest)void hydratePublicShare(publicPreviewManifest);return}const ch=state.characters.find(c=>c.id===id);if(!ch)return;const g=genreDef(ch.genre);if(g?.viewLocked&&!canViewGenre(g)&&!(await ensureGenreViewAccess(g)))return;if(activeDetail&&activeDetail!==id){sessionPrivateUnlocks.delete(activeDetail);clearPublicCharacterSecret(activeDetail)}sessionPrivateUnlocks.delete(id);clearPublicCharacterSecret(id);closePartnerReveal();activeDetail=id;activeDetailChapter=null;renderDetail();openOverlay('detailOverlay');playBookOpening(ch)}
 function renderAlbum(){const ch=state.characters.find(c=>c.id===activeDetail);if(!ch)return;const refs=ch.refs||[];$('#albumTitle').innerHTML=`${esc(ch.name)} · 앨범${ch.albumNote?` <span class="albumTitleNote">${esc(ch.albumNote)}</span>`:''}`;$('#albumBody').innerHTML=refs.length?`<div class="albumGrid">${refs.map((r,i)=>`<button class="albumThumb" data-album-photo="${i}" aria-label="${esc(ch.name)} 참고 이미지 ${i+1} 크게 보기"><img class="protectedImage" draggable="false" src="${refDisplay(r)}" alt="${esc(ch.name)} 참고 이미지 ${i+1}"></button>`).join('')}</div>`:`<div class="albumEmpty">아직 앨범에 저장된 이미지가 없어요.</div>`;$('#albumBody').onclick=e=>{const b=e.target.closest('[data-album-photo]');if(!b)return;activePhotoIndex=Number(b.dataset.albumPhoto)||0;renderPhotoViewer();openOverlay('photoOverlay')}}
 function renderPhotoViewer(){const ch=state.characters.find(c=>c.id===activeDetail);const refs=ch?.refs||[];if(!refs.length)return;activePhotoIndex=Math.max(0,Math.min(activePhotoIndex,refs.length-1));$('#photoTitle').textContent=`${ch.name} · 사진 ${activePhotoIndex+1}`;$('#photoViewerBody').innerHTML=`<div class="photoStage"><img class="protectedImage" draggable="false" src="${refDisplay(refs[activePhotoIndex])}" alt="${esc(ch.name)} 참고 이미지 ${activePhotoIndex+1}"><button class="photoNav prev" id="photoPrev" ${activePhotoIndex<=0?'disabled':''} aria-label="이전 사진">‹</button><button class="photoNav next" id="photoNext" ${activePhotoIndex>=refs.length-1?'disabled':''} aria-label="다음 사진">›</button><div class="photoCounter">${activePhotoIndex+1} / ${refs.length}</div></div>`;const prev=$('#photoPrev'),next=$('#photoNext');if(prev)prev.onclick=()=>{if(activePhotoIndex>0){activePhotoIndex--;renderPhotoViewer()}};if(next)next.onclick=()=>{if(activePhotoIndex<refs.length-1){activePhotoIndex++;renderPhotoViewer()}}}
 function blankCharacter(){const genre=state.settings.genre||state.genres[0]?.name||'';return{id:uid('char'),name:'',partner:'',partnerImage:'',partnerImageOriginal:'',partnerImageOriginalName:'',partnerImageOriginalType:'',partnerImageZoom:1,partnerImageX:50,partnerImageY:50,partnerImages:[],realName:'',gender:'',height:'',age:'',featuredRole:'',anniversaryEnabled:false,anniversaryDate:'',anniversaryStartAtOne:true,albumNote:'',youtubeLinks:[],description:'',descriptionHtml:'',genre,classifications:[],attributes:[],tags:[],favorite:false,privateLocked:false,privatePasswordHash:'',cardImage:'',cardImageOriginal:'',cardImageOriginalName:'',cardImageOriginalType:'',cardImageZoom:1,cardImageX:50,cardImageY:50,detailImage:'',detailImageOriginal:'',detailImageOriginalName:'',detailImageOriginalType:'',detailImageZoom:1,detailImageX:50,detailImageY:50,refs:[],chapters:[makeChapter('챕터 1',[makeBlock('기본 프롬프트','')])],createdAt:now(),updatedAt:now(),order:Math.max(-1,...state.characters.map(c=>c.order))+1}}

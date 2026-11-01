@@ -844,7 +844,7 @@ body:before,body:after,.app:before,.app:after,.controls:before,.brand:after,
 /* v1.36 — slower cover hold so the character name is readable before the book opens. */
 #detailOverlay.book-opening .modalHead,
 #detailOverlay.book-opening .modalBody{
-  animation:detailAfterBook 2.58s ease both!important;
+  animation:detailAfterBook 1.78s ease both!important;
 }
 .bookOpeningStage{
   position:absolute;
@@ -858,7 +858,7 @@ body:before,body:after,.app:before,.app:after,.controls:before,.brand:after,
   background:
     radial-gradient(circle at 50% 46%,color-mix(in srgb,var(--accent) 10%,transparent),transparent 48%),
     color-mix(in srgb,var(--book-paper-2) 88%,transparent);
-  animation:bookStageFade 2.68s ease both;
+  animation:bookStageFade 1.86s ease both;
 }
 .openingBook{
   position:relative;
@@ -867,7 +867,7 @@ body:before,body:after,.app:before,.app:after,.controls:before,.brand:after,
   min-height:340px;
   transform-style:preserve-3d;
   transform:translateX(-24%) rotateX(9deg) rotateZ(-1.2deg) scale(.72);
-  animation:bookFrameOpen 2.24s cubic-bezier(.2,.78,.18,1) both;
+  animation:bookFrameOpen 1.58s cubic-bezier(.2,.78,.18,1) both;
   filter:drop-shadow(0 30px 32px rgba(44,32,19,.26));
 }
 .openingBook .bookRightBase,
@@ -884,7 +884,7 @@ body:before,body:after,.app:before,.app:after,.controls:before,.brand:after,
   box-shadow:inset 0 0 30px rgba(90,68,38,.045);
 }
 .openingBook .bookRightBase{left:50%;border-radius:3px 16px 16px 3px}
-.openingBook .bookLeftBase{right:50%;border-radius:16px 3px 3px 16px;opacity:0;animation:leftPageAppear .32s 1.03s ease forwards}
+.openingBook .bookLeftBase{right:50%;border-radius:16px 3px 3px 16px;opacity:0;animation:leftPageAppear .28s .68s ease forwards}
 .openingBook .bookBackCover{
   position:absolute;
   left:50%;top:2.7%;width:50%;height:94.6%;
@@ -906,7 +906,7 @@ body:before,body:after,.app:before,.app:after,.controls:before,.brand:after,
     radial-gradient(circle at 72% 26%,rgba(255,255,255,.15),transparent 18%),
     linear-gradient(145deg,color-mix(in srgb,var(--accent) 74%,#342847),color-mix(in srgb,var(--accent) 92%,#181323));
   box-shadow:14px 16px 30px rgba(39,28,18,.28),inset 4px 0 0 rgba(255,255,255,.1);
-  animation:frontCoverSwing .94s .72s cubic-bezier(.32,.04,.16,1) forwards;
+  animation:frontCoverSwing .72s .42s cubic-bezier(.32,.04,.16,1) forwards;
   backface-visibility:visible;
 }
 .openingBook .bookFrontCover:after{
@@ -938,8 +938,8 @@ body:before,body:after,.app:before,.app:after,.controls:before,.brand:after,
     color-mix(in srgb,var(--book-paper-2) calc(98% - var(--i) * .35%),var(--accent) calc(2% + var(--i) * .35%));
   box-shadow:-8px 1px 14px rgba(54,39,22,.11);
   backface-visibility:visible;
-  animation:storySheetFlip .54s cubic-bezier(.35,.02,.18,1) forwards;
-  animation-delay:calc(1.30s + var(--i) * .055s);
+  animation:storySheetFlip .38s cubic-bezier(.35,.02,.18,1) forwards;
+  animation-delay:calc(.82s + var(--i) * .04s);
 }
 .openingBook .openingSheet:after{
   content:"";position:absolute;inset:0;
@@ -950,14 +950,14 @@ body:before,body:after,.app:before,.app:after,.controls:before,.brand:after,
   position:absolute;left:49.5%;top:3%;width:1.2%;height:94%;z-index:60;
   border-radius:999px;
   background:linear-gradient(90deg,transparent,rgba(77,56,32,.24),rgba(255,255,255,.42),rgba(77,56,32,.18),transparent);
-  opacity:0;animation:spineFlash .7s .94s ease both;
+  opacity:0;animation:spineFlash .48s .62s ease both;
 }
 .openingBook .pageDust{position:absolute;inset:0;pointer-events:none;z-index:70}
 .openingBook .pageDust i{
   position:absolute;left:50%;top:50%;width:4px;height:4px;border-radius:50%;
   background:color-mix(in srgb,var(--accent) 52%,#fff 48%);
-  opacity:0;animation:pageDustFly .65s ease-out forwards;
-  animation-delay:calc(1.34s + var(--i) * .06s);
+  opacity:0;animation:pageDustFly .44s ease-out forwards;
+  animation-delay:calc(.86s + var(--i) * .04s);
 }
 @keyframes bookFrameOpen{
   0%{transform:translateX(-24%) rotateX(9deg) rotateZ(-1.2deg) scale(.72)}
@@ -995,8 +995,8 @@ body:before,body:after,.app:before,.app:after,.controls:before,.brand:after,
 @media(max-width:760px){
   .openingBook{width:96%;height:min(64%,560px);min-height:300px;transform:translateX(-23%) rotateX(7deg) scale(.72)}
   .openingBook .coverLabel{padding:18px}
-  .openingBook .openingSheet{animation-duration:.48s;animation-delay:calc(1.22s + var(--i) * .045s)}
-  .openingBook .bookFrontCover{animation-duration:.86s;animation-delay:.68s}
+  .openingBook .openingSheet{animation-duration:.36s;animation-delay:calc(.80s + var(--i) * .04s)}
+  .openingBook .bookFrontCover{animation-duration:.72s;animation-delay:.42s}
 }
 @media(prefers-reduced-motion:reduce){
   #detailOverlay.book-opening .modalHead,#detailOverlay.book-opening .modalBody{animation:none!important;opacity:1!important}
@@ -2536,7 +2536,7 @@ async function unpackChunkedShare(manifest,capturePacked){
  const descriptors=manifest.chunks;
  if(!Array.isArray(descriptors)||!descriptors.length||descriptors.length>2000||!Number.isSafeInteger(manifest.totalLength)||manifest.totalLength>350000000||!['gzip-base64','json'].includes(manifest.encoding))throw new Error('공유본의 저장 정보가 올바르지 않아요.');
  const parts=new Array(descriptors.length);
- await shareLimited(descriptors,3,async(d,index)=>{
+ await shareLimited(descriptors,navigator.connection?.saveData?2:6,async(d,index)=>{
   if(!slugOkay(d?.slug)||!Number.isSafeInteger(d.length)||d.length<1||d.length>SHARE_CHUNK_SIZE||typeof d.hash!=='string')throw new Error('공유본 조각 정보가 손상됐어요.');
   let chunk;for(let attempt=0;attempt<3;attempt++){try{chunk=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:d.slug}));break}catch(error){if(attempt===2)throw error;await new Promise(resolve=>setTimeout(resolve,500*(attempt+1)))}}
   if(chunk?.__paFormat!==SHARE_PART_FORMAT||chunk.__paRevision!==manifest.__paRevision||chunk.index!==index||typeof chunk.data!=='string'||chunk.data.length!==d.length||shareChunkHash(chunk.data)!==d.hash)throw new Error('공유본을 완전히 읽지 못했어요. 잠시 후 다시 열어 주세요.');
@@ -2944,9 +2944,9 @@ function playBookOpening(ch){
  for(let i=0;i<9;i++){const sheet=document.createElement('span');sheet.className='openingSheet';sheet.style.setProperty('--i',i);book.insertBefore(sheet,spine)}
  const dust=book.querySelector('.pageDust');for(let i=0;i<7;i++){const dot=document.createElement('i');dot.style.setProperty('--i',i);dust.appendChild(dot)}
  stage.appendChild(book);modal.appendChild(stage);void stage.offsetWidth;ov.classList.add('book-opening');
- setTimeout(()=>{stage.remove();ov.classList.remove('book-opening')},2720)
+ setTimeout(()=>{stage.remove();ov.classList.remove('book-opening')},1900)
 }
-async function openDetail(id){if(publicMode&&publicPreviewPending){const preview=state.characters.find(c=>c.id===id);if(!preview)return;pendingPreviewOpen={kind:'character',id};activeDetail=id;activeDetailChapter=null;closePartnerReveal();renderDetail();openOverlay('detailOverlay');previewDetailStatus('상세 내용을 불러오는 중이에요…');if(!publicPreviewLoading&&publicPreviewManifest)void hydratePublicShare(publicPreviewManifest);return}const ch=state.characters.find(c=>c.id===id);if(!ch)return;const g=genreDef(ch.genre);if(g?.viewLocked&&!canViewGenre(g)&&!(await ensureGenreViewAccess(g)))return;if(activeDetail&&activeDetail!==id){sessionPrivateUnlocks.delete(activeDetail);clearPublicCharacterSecret(activeDetail)}sessionPrivateUnlocks.delete(id);clearPublicCharacterSecret(id);closePartnerReveal();activeDetail=id;activeDetailChapter=null;renderDetail();openOverlay('detailOverlay');playBookOpening(ch)}
+async function openDetail(id){if(publicMode&&publicPreviewPending){const preview=state.characters.find(c=>c.id===id);if(!preview)return;pendingPreviewOpen={kind:'character',id};activeDetail=id;activeDetailChapter=null;closePartnerReveal();renderDetail();openOverlay('detailOverlay');previewDetailStatus('상세 내용을 불러오는 중이에요…');playBookOpening(preview);if(!publicPreviewLoading&&publicPreviewManifest)void hydratePublicShare(publicPreviewManifest);return}const ch=state.characters.find(c=>c.id===id);if(!ch)return;const g=genreDef(ch.genre);if(g?.viewLocked&&!canViewGenre(g)&&!(await ensureGenreViewAccess(g)))return;if(activeDetail&&activeDetail!==id){sessionPrivateUnlocks.delete(activeDetail);clearPublicCharacterSecret(activeDetail)}sessionPrivateUnlocks.delete(id);clearPublicCharacterSecret(id);closePartnerReveal();activeDetail=id;activeDetailChapter=null;renderDetail();openOverlay('detailOverlay');playBookOpening(ch)}
 function renderAlbum(){const ch=state.characters.find(c=>c.id===activeDetail);if(!ch)return;const refs=ch.refs||[];$('#albumTitle').innerHTML=`${esc(ch.name)} · 앨범${ch.albumNote?` <span class="albumTitleNote">${esc(ch.albumNote)}</span>`:''}`;$('#albumBody').innerHTML=refs.length?`<div class="albumGrid">${refs.map((r,i)=>`<button class="albumThumb" data-album-photo="${i}" aria-label="${esc(ch.name)} 참고 이미지 ${i+1} 크게 보기"><img class="protectedImage" draggable="false" src="${refDisplay(r)}" alt="${esc(ch.name)} 참고 이미지 ${i+1}"></button>`).join('')}</div>`:`<div class="albumEmpty">아직 앨범에 저장된 이미지가 없어요.</div>`;$('#albumBody').onclick=e=>{const b=e.target.closest('[data-album-photo]');if(!b)return;activePhotoIndex=Number(b.dataset.albumPhoto)||0;renderPhotoViewer();openOverlay('photoOverlay')}}
 function renderPhotoViewer(){const ch=state.characters.find(c=>c.id===activeDetail);const refs=ch?.refs||[];if(!refs.length)return;activePhotoIndex=Math.max(0,Math.min(activePhotoIndex,refs.length-1));$('#photoTitle').textContent=`${ch.name} · 사진 ${activePhotoIndex+1}`;$('#photoViewerBody').innerHTML=`<div class="photoStage"><img class="protectedImage" draggable="false" src="${refDisplay(refs[activePhotoIndex])}" alt="${esc(ch.name)} 참고 이미지 ${activePhotoIndex+1}"><button class="photoNav prev" id="photoPrev" ${activePhotoIndex<=0?'disabled':''} aria-label="이전 사진">‹</button><button class="photoNav next" id="photoNext" ${activePhotoIndex>=refs.length-1?'disabled':''} aria-label="다음 사진">›</button><div class="photoCounter">${activePhotoIndex+1} / ${refs.length}</div></div>`;const prev=$('#photoPrev'),next=$('#photoNext');if(prev)prev.onclick=()=>{if(activePhotoIndex>0){activePhotoIndex--;renderPhotoViewer()}};if(next)next.onclick=()=>{if(activePhotoIndex<refs.length-1){activePhotoIndex++;renderPhotoViewer()}}}
 function blankCharacter(){const genre=state.settings.genre||state.genres[0]?.name||'';return{id:uid('char'),name:'',partner:'',partnerImage:'',partnerImageOriginal:'',partnerImageOriginalName:'',partnerImageOriginalType:'',partnerImageZoom:1,partnerImageX:50,partnerImageY:50,partnerImages:[],realName:'',gender:'',height:'',age:'',featuredRole:'',anniversaryEnabled:false,anniversaryDate:'',anniversaryStartAtOne:true,albumNote:'',youtubeLinks:[],description:'',descriptionHtml:'',genre,classifications:[],attributes:[],tags:[],favorite:false,privateLocked:false,privatePasswordHash:'',cardImage:'',cardImageOriginal:'',cardImageOriginalName:'',cardImageOriginalType:'',cardImageZoom:1,cardImageX:50,cardImageY:50,detailImage:'',detailImageOriginal:'',detailImageOriginalName:'',detailImageOriginalType:'',detailImageZoom:1,detailImageX:50,detailImageY:50,refs:[],chapters:[makeChapter('챕터 1',[makeBlock('기본 프롬프트','')])],createdAt:now(),updatedAt:now(),order:Math.max(-1,...state.characters.map(c=>c.order))+1}}

@@ -2548,7 +2548,7 @@ async function unpackChunkedShare(manifest,capturePacked){
 }
 const SHARE_CLEANUP_KEY='promptAtlasShareChunkCleanupV1';
 function shareCleanupQueue(){try{return JSON.parse(localStorage.getItem(SHARE_CLEANUP_KEY)||'[]')||[]}catch{return[]}}
-function scheduleShareCleanup(rootSlug,token,manifest,delay=120000){if(manifest?.__paFormat!==SHARE_CHUNK_FORMAT||!Array.isArray(manifest.chunks))return;const queue=shareCleanupQueue();queue.push({rootSlug,token,slugs:manifest.chunks.map(c=>c.slug),due:Date.now()+delay});localStorage.setItem(SHARE_CLEANUP_KEY,JSON.stringify(queue));setTimeout(()=>{void flushShareCleanup()},delay+1000)}
+function scheduleShareCleanup(rootSlug,token,manifest,delay=120000){if(manifest?.__paFormat!==SHARE_CHUNK_FORMAT||!Array.isArray(manifest.chunks))return;const slugs=[...manifest.chunks.map(c=>c.slug),...(manifest.detailSlugs||[])];const queue=shareCleanupQueue();queue.push({rootSlug,token,slugs,due:Date.now()+delay});localStorage.setItem(SHARE_CLEANUP_KEY,JSON.stringify(queue));setTimeout(()=>{void flushShareCleanup()},delay+1000)}
 let shareCleanupRunning=false;
 async function flushShareCleanup(){if(shareCleanupRunning||!shareConfigured())return;shareCleanupRunning=true;try{const queue=shareCleanupQueue(),keep=[];for(const item of queue){if(item.due>Date.now()){keep.push(item);continue}const failed=[];await shareLimited(item.slugs||[],2,async slug=>{try{await shareRpc('pa_share_delete',{p_slug:slug,p_token:item.token})}catch{failed.push(slug)}});if(failed.length)keep.push({...item,slugs:failed,due:Date.now()+60000})}localStorage.setItem(SHARE_CLEANUP_KEY,JSON.stringify(keep))}finally{shareCleanupRunning=false}}
 function bytesToBase64(bytes){let out='';for(let i=0;i<bytes.length;i+=32768)out+=String.fromCharCode(...bytes.subarray(i,i+32768));return btoa(out)}
@@ -2636,6 +2636,23 @@ function publicError(message){const grid=document.getElementById('grid');if(grid
 function applyPublicSnapshot(payload){if(!payload||!Array.isArray(payload.characters))throw new Error('공개된 도감이 없어요.');invalidateGridCache();state=migrateState(payload);state.genres=(state.genres||[]).map(g=>({...g,viewLocked:false,viewPasswordHash:''}))}
 function publicShareRemoved(){document.documentElement.classList.add('public-booting');const screen=document.getElementById('publicBootScreen');screen.innerHTML='<div class="publicBootCard"><strong>공유가 해제되었어요.</strong><span>이 주소의 공개 도감을 더 이상 볼 수 없어요.</span></div>'}
 let publicPreviewPending=false,publicPreviewLoading=false,publicPreviewManifest=null,pendingPreviewOpen=null;
+const publicCharacterLoads=new Map();
+async function loadPublicCharacter(manifest,id){
+ const detail=manifest?.details?.[id];if(!detail)return false;
+ const key=`${manifest.__paRevision}:${id}`;
+ if(publicCharacterLoads.has(key))return publicCharacterLoads.get(key);
+ const loading=(async()=>{
+  const raw=detail.slug?sharePayloadOf(await shareRpc('pa_share_get',{p_slug:detail.slug})):detail;
+  const payload=await unpackSharePayload(raw);
+  const character=payload?.characters?.[0];if(!character||character.id!==id)throw new Error('캐릭터 상세 정보가 일치하지 않아요.');
+  if(publicPreviewManifest!==manifest)return false;
+  const index=state.characters.findIndex(ch=>ch.id===id);if(index<0)return false;
+  character.__paDetailReady=true;state.characters[index]=character;
+  if(activeDetail===id&&$('#detailOverlay')?.classList.contains('open')){renderDetail();$('#detailBody').querySelector('#previewDetailStatus')?.remove()}
+  return true;
+ })();publicCharacterLoads.set(key,loading);
+ try{return await loading}catch(error){publicCharacterLoads.delete(key);throw error}
+}
 function previewDetailStatus(message,failed=false){
  const body=$('#detailBody');if(!body||!$('#detailOverlay')?.classList.contains('open'))return;
  let status=body.querySelector('#previewDetailStatus');if(!status){status=document.createElement('div');status.id='previewDetailStatus';status.className='publicLoadState';status.style.cssText='margin:12px 16px;position:relative;z-index:2';body.prepend(status)}
@@ -2647,7 +2664,8 @@ function showPublicPreview(manifest){
  if($('#detailOverlay')?.classList.contains('open'))closeOverlay('detailOverlay',true);
  publicPreviewPending=true;publicPreviewManifest=manifest;sessionPrivateUnlocks.clear();sessionViewUnlocks.clear();applyPublicSnapshot(manifest.preview);renderAll();document.dispatchEvent(new Event('prompt-atlas-state-changed'));return true;
 }
-async function hydratePublicShare(manifest,announce=false){
+async function hydratePublicShare(manifest,announce=false,force=false){
+ if(!force&&manifest?.details&&$('#detailOverlay')?.classList.contains('open')){setTimeout(()=>{if(publicPreviewManifest===manifest)void hydratePublicShare(manifest,announce)},2500);return}
  if(publicPreviewLoading)return;publicPreviewLoading=true;
  try{
   let packed=manifest;const payload=await unpackSharePayload(manifest,p=>{packed=p});if(!payload||!Array.isArray(payload.characters))throw new Error('공유본 확인 실패');
@@ -2681,7 +2699,7 @@ async function refreshPublicShare(cachedRevision){
   const raw=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:requestedShareSlug.toLowerCase()}));
   if(!raw){await deletePublicShareCache(requestedShareSlug).catch(()=>{});publicShareRemoved();return}
   if(raw.__paRevision===cachedRevision)return;
-  if(showPublicPreview(raw)){void hydratePublicShare(raw,true);return}
+ if(showPublicPreview(raw)){setTimeout(()=>{if(publicPreviewManifest===raw)void hydratePublicShare(raw,true)},raw.details?4000:0);return}
   let packed=raw;const payload=await unpackSharePayload(raw,p=>{packed=p});if(!payload||!Array.isArray(payload.characters))throw new Error('공유본 확인 실패');
   await writePublicShareCache(requestedShareSlug,packed).catch(()=>{});
   if($('#detailOverlay')?.classList.contains('open'))closeOverlay('detailOverlay',true);
@@ -2694,7 +2712,7 @@ async function loadPublicShare(){
   const cached=await readPublicShareCache(requestedShareSlug).catch(()=>null);
   if(cached){try{applyPublicSnapshot(await unpackSharePayload(cached.packed));setTimeout(()=>{void refreshPublicShare(cached.packed.__paRevision)},0);return true}catch{await deletePublicShareCache(requestedShareSlug).catch(()=>{})}}
   const raw=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:requestedShareSlug.toLowerCase()}));
-  if(showPublicPreview(raw)){setTimeout(()=>{void hydratePublicShare(raw)},0);return true}
+  if(showPublicPreview(raw)){setTimeout(()=>{if(publicPreviewManifest===raw)void hydratePublicShare(raw)},raw.details?4000:0);return true}
   let packed=raw;const payload=await unpackSharePayload(raw,p=>{packed=p});applyPublicSnapshot(payload);await writePublicShareCache(requestedShareSlug,packed).catch(()=>{});return true;
  }catch(e){publicError(String(e?.message||'공개된 도감을 찾지 못했어요.'));return false}
 }
@@ -2946,7 +2964,7 @@ function playBookOpening(ch){
  stage.appendChild(book);modal.appendChild(stage);void stage.offsetWidth;ov.classList.add('book-opening');
  setTimeout(()=>{stage.remove();ov.classList.remove('book-opening')},1900)
 }
-async function openDetail(id){if(publicMode&&publicPreviewPending){const preview=state.characters.find(c=>c.id===id);if(!preview)return;pendingPreviewOpen={kind:'character',id};activeDetail=id;activeDetailChapter=null;closePartnerReveal();renderDetail();openOverlay('detailOverlay');previewDetailStatus('상세 내용을 불러오는 중이에요…');playBookOpening(preview);if(!publicPreviewLoading&&publicPreviewManifest)void hydratePublicShare(publicPreviewManifest);return}const ch=state.characters.find(c=>c.id===id);if(!ch)return;const g=genreDef(ch.genre);if(g?.viewLocked&&!canViewGenre(g)&&!(await ensureGenreViewAccess(g)))return;if(activeDetail&&activeDetail!==id){sessionPrivateUnlocks.delete(activeDetail);clearPublicCharacterSecret(activeDetail)}sessionPrivateUnlocks.delete(id);clearPublicCharacterSecret(id);closePartnerReveal();activeDetail=id;activeDetailChapter=null;renderDetail();openOverlay('detailOverlay');playBookOpening(ch)}
+async function openDetail(id){if(publicMode&&publicPreviewPending){const preview=state.characters.find(c=>c.id===id);if(!preview)return;pendingPreviewOpen={kind:'character',id};activeDetail=id;activeDetailChapter=null;closePartnerReveal();renderDetail();openOverlay('detailOverlay');if(!preview.__paDetailReady)previewDetailStatus('상세 내용을 불러오는 중이에요…');playBookOpening(preview);const manifest=publicPreviewManifest;if(preview.__paDetailReady)return;if(manifest?.details?.[id])void loadPublicCharacter(manifest,id).catch(()=>{if(publicPreviewManifest===manifest)void hydratePublicShare(manifest,false,true)});else if(!publicPreviewLoading&&manifest)void hydratePublicShare(manifest);return}const ch=state.characters.find(c=>c.id===id);if(!ch)return;const g=genreDef(ch.genre);if(g?.viewLocked&&!canViewGenre(g)&&!(await ensureGenreViewAccess(g)))return;if(activeDetail&&activeDetail!==id){sessionPrivateUnlocks.delete(activeDetail);clearPublicCharacterSecret(activeDetail)}sessionPrivateUnlocks.delete(id);clearPublicCharacterSecret(id);closePartnerReveal();activeDetail=id;activeDetailChapter=null;renderDetail();openOverlay('detailOverlay');playBookOpening(ch)}
 function renderAlbum(){const ch=state.characters.find(c=>c.id===activeDetail);if(!ch)return;const refs=ch.refs||[];$('#albumTitle').innerHTML=`${esc(ch.name)} · 앨범${ch.albumNote?` <span class="albumTitleNote">${esc(ch.albumNote)}</span>`:''}`;$('#albumBody').innerHTML=refs.length?`<div class="albumGrid">${refs.map((r,i)=>`<button class="albumThumb" data-album-photo="${i}" aria-label="${esc(ch.name)} 참고 이미지 ${i+1} 크게 보기"><img class="protectedImage" draggable="false" src="${refDisplay(r)}" alt="${esc(ch.name)} 참고 이미지 ${i+1}"></button>`).join('')}</div>`:`<div class="albumEmpty">아직 앨범에 저장된 이미지가 없어요.</div>`;$('#albumBody').onclick=e=>{const b=e.target.closest('[data-album-photo]');if(!b)return;activePhotoIndex=Number(b.dataset.albumPhoto)||0;renderPhotoViewer();openOverlay('photoOverlay')}}
 function renderPhotoViewer(){const ch=state.characters.find(c=>c.id===activeDetail);const refs=ch?.refs||[];if(!refs.length)return;activePhotoIndex=Math.max(0,Math.min(activePhotoIndex,refs.length-1));$('#photoTitle').textContent=`${ch.name} · 사진 ${activePhotoIndex+1}`;$('#photoViewerBody').innerHTML=`<div class="photoStage"><img class="protectedImage" draggable="false" src="${refDisplay(refs[activePhotoIndex])}" alt="${esc(ch.name)} 참고 이미지 ${activePhotoIndex+1}"><button class="photoNav prev" id="photoPrev" ${activePhotoIndex<=0?'disabled':''} aria-label="이전 사진">‹</button><button class="photoNav next" id="photoNext" ${activePhotoIndex>=refs.length-1?'disabled':''} aria-label="다음 사진">›</button><div class="photoCounter">${activePhotoIndex+1} / ${refs.length}</div></div>`;const prev=$('#photoPrev'),next=$('#photoNext');if(prev)prev.onclick=()=>{if(activePhotoIndex>0){activePhotoIndex--;renderPhotoViewer()}};if(next)next.onclick=()=>{if(activePhotoIndex<refs.length-1){activePhotoIndex++;renderPhotoViewer()}}}
 function blankCharacter(){const genre=state.settings.genre||state.genres[0]?.name||'';return{id:uid('char'),name:'',partner:'',partnerImage:'',partnerImageOriginal:'',partnerImageOriginalName:'',partnerImageOriginalType:'',partnerImageZoom:1,partnerImageX:50,partnerImageY:50,partnerImages:[],realName:'',gender:'',height:'',age:'',featuredRole:'',anniversaryEnabled:false,anniversaryDate:'',anniversaryStartAtOne:true,albumNote:'',youtubeLinks:[],description:'',descriptionHtml:'',genre,classifications:[],attributes:[],tags:[],favorite:false,privateLocked:false,privatePasswordHash:'',cardImage:'',cardImageOriginal:'',cardImageOriginalName:'',cardImageOriginalType:'',cardImageZoom:1,cardImageX:50,cardImageY:50,detailImage:'',detailImageOriginal:'',detailImageOriginalName:'',detailImageOriginalType:'',detailImageZoom:1,detailImageX:50,detailImageY:50,refs:[],chapters:[makeChapter('챕터 1',[makeBlock('기본 프롬프트','')])],createdAt:now(),updatedAt:now(),order:Math.max(-1,...state.characters.map(c=>c.order))+1}}
@@ -3505,8 +3523,17 @@ function renderShare(){
     try{previousManifest=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:slug}))}catch{}
     let done=0;setStatus('공유본 전송 중…',`${size}MB를 ${chunkPlan.parts.length}개로 나눠 저장해요. 이 창을 닫지 말아 주세요. (0/${chunkPlan.parts.length})`);
     await shareLimited(chunkPlan.parts,3,async(part,index)=>{attemptedParts.push(part);await publishSharePart(part,index,revision,token);done++;setStatus('공유본 전송 중…',`${size}MB · 저장 완료 ${done}/${chunkPlan.parts.length}. 이 창을 닫지 말아 주세요.`)});
+    setStatus('캐릭터 상세 준비 중…','캐릭터를 누르면 바로 열 수 있도록 개별 내용을 저장하고 있어요.');
+    const details={},detailSlugs=[];let detailDone=0;
+    await shareLimited(snapshot.characters,4,async(ch,index)=>{
+     const single=await packSharePayload({version:snapshot.version,characters:[ch]},`${revision}-${index.toString(36)}`);
+     const plan=shareChunkDescriptors(single,`${revision}-${index.toString(36)}`);
+     if(plan){for(let j=0;j<plan.parts.length;j++){const part=plan.parts[j];attemptedParts.push(part);detailSlugs.push(part.slug);await publishSharePart(part,j,`${revision}-${index.toString(36)}`,token)}details[ch.id]={__paFormat:SHARE_CHUNK_FORMAT,__paRevision:`${revision}-${index.toString(36)}`,encoding:single.compressed?'gzip-base64':'json',totalLength:plan.encoded.length,chunks:plan.parts.map(({slug,length,hash})=>({slug,length,hash}))}}
+     else{const partSlug=`pc${revision.replace(/[^a-z0-9]/g,'').slice(-20)}${index.toString(36).padStart(3,'0')}`;detailSlugs.push(partSlug);attemptedParts.push({slug:partSlug});await shareRpc('pa_share_publish',{p_slug:partSlug,p_payload:single.value,p_token:token});details[ch.id]={slug:partSlug}}
+     detailDone++;setStatus('캐릭터 상세 준비 중…',`${detailDone}/${snapshot.characters.length}명 완료. 이 창을 닫지 말아 주세요.`);
+    });
     setStatus('첫 화면 준비 중…','방문자가 바로 볼 수 있는 화면을 만들고 있어요.');const preview=await makePublicPreview(snapshot);
-    const manifest={__paFormat:SHARE_CHUNK_FORMAT,__paRevision:revision,encoding:packed.compressed?'gzip-base64':'json',totalLength:chunkPlan.encoded.length,chunks:chunkPlan.parts.map(({slug,length,hash})=>({slug,length,hash})),preview};
+    const manifest={__paFormat:SHARE_CHUNK_FORMAT,__paRevision:revision,encoding:packed.compressed?'gzip-base64':'json',totalLength:chunkPlan.encoded.length,chunks:chunkPlan.parts.map(({slug,length,hash})=>({slug,length,hash})),details,detailSlugs,preview};
     setStatus('업데이트 확인 중…','모든 조각을 저장했어요. 이제 공개 주소를 새 버전으로 바꿔 확인해요.');manifestAttempted=true;
     await shareRpc('pa_share_publish',{p_slug:slug,p_payload:manifest,p_token:token});
    }else{

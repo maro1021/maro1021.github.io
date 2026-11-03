@@ -2587,14 +2587,14 @@ async function packSharePayload(payload,revision){
  const packedBytes=new Blob([JSON.stringify(packed)]).size;
  return packedBytes<originalBytes.length?{value:packed,originalBytes:originalBytes.length,packedBytes,compressed:true}:{value:{...payload,__paRevision:revision},originalBytes:originalBytes.length,packedBytes:originalBytes.length,compressed:false};
 }
-async function sharePreviewImage(source,maxSide=280){
+async function sharePreviewImage(source,maxSide=280,maxLength=26000){
  const src=String(source||'');if(!src)return'';
  if(!src.startsWith('data:image/'))return src.length<2000?src:'';
  return new Promise(resolve=>{
   const img=new Image();let settled=false;
   const done=value=>{if(settled)return;settled=true;clearTimeout(timer);resolve(value)};
   const timer=setTimeout(()=>done(''),5000);
-  img.onload=()=>{try{const scale=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight)),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);const small=canvas.toDataURL('image/webp',.72);done(small.length<26000?small:'')}catch{done('')}};
+  img.onload=()=>{try{const canvas=document.createElement('canvas');for(const [side,quality] of [[maxSide,.64],[Math.min(maxSide,92),.5],[Math.min(maxSide,68),.42],[Math.min(maxSide,48),.35]]){const scale=Math.min(1,side/Math.max(img.naturalWidth,img.naturalHeight));canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);const small=canvas.toDataURL('image/webp',quality);if(small.length<=maxLength){done(small);return}}done('')}catch{done('')}};
   img.onerror=()=>done('');img.src=src;
  });
 }
@@ -2602,13 +2602,15 @@ async function makePublicPreview(snapshot){
  const main=snapshot.sitePages?.main||{};
  const preview={version:snapshot.version,genres:snapshot.genres,globalTags:[],settings:{...snapshot.settings,siteLogo:'',wallpaperImage:''},sitePages:{main:{...main,portraitImage:'',portraitImageOriginal:'',intro:String(main.intro||'').slice(0,3000),guideItems:(main.guideItems||[]).slice(0,20).map(item=>String(item).slice(0,350))}},characters:(snapshot.characters||[]).map(ch=>({id:ch.id,name:ch.name,genre:ch.genre,description:String(ch.description||'').slice(0,500),descriptionHtml:'',partner:ch.partner,realName:ch.realName,gender:ch.gender,height:ch.height,age:ch.age,classifications:ch.classifications,attributes:ch.attributes,tags:ch.tags,privateLocked:ch.privateLocked,privatePasswordHash:'',__protectedV2:ch.__protectedV2?{preview:true}:null,featuredRole:ch.featuredRole,anniversaryEnabled:ch.anniversaryEnabled,anniversaryDate:ch.anniversaryDate,anniversaryStartAtOne:ch.anniversaryStartAtOne,order:ch.order,createdAt:ch.createdAt,updatedAt:ch.updatedAt,cardImage:'',detailImage:'',refs:[],chapters:[],youtubeLinks:[],partnerImage:'',partnerImages:[]})),records:(snapshot.records||[]).map(record=>({id:record.id,title:record.title,description:record.locked?'':String(record.description||'').slice(0,350),locked:!!record.locked,__protectedV2:record.__protectedV2?{preview:true}:null,mainImage:'',chapters:record.locked?[]:(record.chapters||[]).map(chapter=>({id:chapter.id,name:chapter.name,groups:(chapter.groups||[]).map(group=>({id:group.id,name:group.name,promptBlocks:(group.promptBlocks||[]).map(block=>({id:block.id,name:block.name,locked:!!block.locked,__protectedV2:block.__protectedV2?{preview:true}:null,text:'',entries:block.locked?[]:(block.entries||[]).map(entry=>({id:entry.id,name:entry.name,text:String(entry.text||'').slice(0,450)})),image:''}))}))})),createdAt:record.createdAt,updatedAt:record.updatedAt,order:record.order})),logs:(snapshot.logs||[]).map(log=>({id:log.id,character:log.character,date:log.date,title:log.title,tags:log.tags,locked:log.locked,passwordHash:'',__protectedV2:log.__protectedV2?{preview:true}:null,text:log.locked?'':String(log.text||'').slice(0,300),input:''}))};
  let size=JSON.stringify(preview).length,limit=270000;
- const addImage=async(target,key,source,maxSide)=>{if(size>=limit)return;const image=await sharePreviewImage(source,maxSide);if(image&&size+image.length<limit){target[key]=image;size+=image.length}};
- await addImage(preview.settings,'siteLogo',snapshot.settings?.siteLogo,96);
- await addImage(preview.settings,'wallpaperImage',snapshot.settings?.wallpaperImage,560);
- await addImage(preview.sitePages.main,'portraitImage',main.portraitImage,280);
+ const addImage=async(target,key,source,maxSide,maxLength=26000)=>{if(size>=limit)return;const image=await sharePreviewImage(source,maxSide,Math.min(maxLength,limit-size));if(image&&size+image.length<limit){target[key]=image;size+=image.length}};
+ // Give every character a small cover before using the remaining space for decoration.
+ const cardBudget=Math.max(2200,Math.min(8500,Math.floor((limit-size-42000)/Math.max(1,preview.characters.length))));
  const priority=preview.characters.map((_,i)=>i).sort((a,b)=>Number(snapshot.characters[b].featuredRole==='main')-Number(snapshot.characters[a].featuredRole==='main')||Number(snapshot.characters[b].featuredRole==='sub')-Number(snapshot.characters[a].featuredRole==='sub')||a-b);
- for(const i of priority)await addImage(preview.characters[i],'cardImage',snapshot.characters[i].cardImage||snapshot.characters[i].detailImage,280);
- for(let i=0;i<(preview.records||[]).length;i++)await addImage(preview.records[i],'mainImage',snapshot.records[i]?.mainImage,240);
+ for(const i of priority)await addImage(preview.characters[i],'cardImage',snapshot.characters[i].cardImage||snapshot.characters[i].detailImage,120,cardBudget);
+ for(let i=0;i<(preview.records||[]).length;i++)await addImage(preview.records[i],'mainImage',snapshot.records[i]?.mainImage,96,Math.min(5000,Math.floor((limit-size-15000)/Math.max(1,preview.records.length-i))));
+ await addImage(preview.settings,'siteLogo',snapshot.settings?.siteLogo,96,6500);
+ await addImage(preview.settings,'wallpaperImage',snapshot.settings?.wallpaperImage,480,18000);
+ await addImage(preview.sitePages.main,'portraitImage',main.portraitImage,220,11000);
  // Tiny decorations can appear with the instant preview; large uploaded images wait for the full share.
  preview.sitePages.personaDecorations=[];
  for(const decoration of snapshot.sitePages?.personaDecorations||[]){

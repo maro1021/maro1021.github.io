@@ -2152,6 +2152,25 @@ html #atlasPagePersona #grid .card .chips{margin-top:auto!important}
 html #atlasPagePersona #grid .partnerTag{color:#263a59!important;background:#eaf4ff!important}
 html #atlasPagePersona #grid .partnerTagLabel{color:#587aa8!important}
 </style>
+<style id="atlas-description-editor-contrast">
+/* Match the rich text editing surface to the night theme, including white formatted text. */
+html #editorOverlay #eDescRich.richDescriptionEditor{background:#1d2a4d!important;color:#f5f7ff!important;caret-color:#f5f7ff!important}
+html #editorOverlay #eDescRich.richDescriptionEditor:empty::before{color:#b7c6e2!important}
+</style>
+<style id="atlas-mobile-card-readability">
+@media(max-width:680px){
+ html .app{padding-inline:10px!important}
+ html #atlasPagePersona #grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:11px!important}
+ html #atlasPagePersona #grid .card .cover{margin:6px 6px 0!important}
+ html #atlasPagePersona #grid .cardBody{padding:10px 11px 13px!important}
+ html #atlasPagePersona #grid .titleLine{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:5px!important}
+ html #atlasPagePersona #grid .namePairLine{width:100%;min-width:0}
+ html #atlasPagePersona #grid .titleLine h3{overflow-wrap:normal!important;word-break:keep-all!important}
+ html #atlasPagePersona #grid .badgeStack{align-self:flex-start!important}
+ html #atlasPagePersona #grid .desc.richDescription{display:-webkit-box!important;-webkit-box-orient:vertical!important;-webkit-line-clamp:4!important;line-clamp:4!important;max-height:none!important;overflow:hidden!important;font-size:12px!important;line-height:1.5!important;margin:8px 0!important}
+ html #atlasPagePersona #grid .chips{margin-top:6px!important}
+}
+</style>
 </head>
 <body>
 <img id="atlasWallpaperLayer" class="protectedImage" alt="" aria-hidden="true" draggable="false" hidden>
@@ -2711,26 +2730,26 @@ async function packSharePayload(payload,revision){
  const packedBytes=new Blob([JSON.stringify(packed)]).size;
  return packedBytes<originalBytes.length?{value:packed,originalBytes:originalBytes.length,packedBytes,compressed:true}:{value:{...payload,__paRevision:revision},originalBytes:originalBytes.length,packedBytes:originalBytes.length,compressed:false};
 }
-async function sharePreviewImage(source,maxSide=280,maxLength=26000){
+async function sharePreviewImage(source,maxSide=480,maxLength=30000){
  const src=String(source||'');if(!src)return'';
  if(!src.startsWith('data:image/'))return src.length<2000?src:'';
  return new Promise(resolve=>{
   const img=new Image();let settled=false;
   const done=value=>{if(settled)return;settled=true;clearTimeout(timer);resolve(value)};
   const timer=setTimeout(()=>done(''),5000);
-  img.onload=()=>{try{const canvas=document.createElement('canvas');for(const [side,quality] of [[maxSide,.64],[Math.min(maxSide,92),.5],[Math.min(maxSide,68),.42],[Math.min(maxSide,48),.35]]){const scale=Math.min(1,side/Math.max(img.naturalWidth,img.naturalHeight));canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);const small=canvas.toDataURL('image/webp',quality);if(small.length<=maxLength){done(small);return}}done('')}catch{done('')}};
+  img.onload=()=>{try{const canvas=document.createElement('canvas');for(const [side,quality] of [[maxSide,.82],[Math.min(maxSide,360),.74],[Math.min(maxSide,240),.68],[Math.min(maxSide,160),.62]]){const scale=Math.min(1,side/Math.max(img.naturalWidth,img.naturalHeight));canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);const small=canvas.toDataURL('image/webp',quality);if(small.length<=maxLength){done(small);return}}done('')}catch{done('')}};
   img.onerror=()=>done('');img.src=src;
  });
 }
 async function makePublicPreview(snapshot){
  const main=snapshot.sitePages?.main||{};
  const preview={version:snapshot.version,genres:snapshot.genres,globalTags:[],settings:{...snapshot.settings,siteLogo:'',wallpaperImage:''},sitePages:{main:{...main,portraitImage:'',portraitImageOriginal:'',intro:String(main.intro||'').slice(0,3000),guideItems:(main.guideItems||[]).slice(0,20).map(item=>String(item).slice(0,350))}},characters:(snapshot.characters||[]).map(ch=>({id:ch.id,name:ch.name,genre:ch.genre,description:String(ch.description||'').slice(0,500),descriptionHtml:'',partner:ch.partner,realName:ch.realName,gender:ch.gender,height:ch.height,age:ch.age,classifications:ch.classifications,attributes:ch.attributes,tags:ch.tags,privateLocked:ch.privateLocked,privatePasswordHash:'',__protectedV2:ch.__protectedV2?{preview:true}:null,featuredRole:ch.featuredRole,anniversaryEnabled:ch.anniversaryEnabled,anniversaryDate:ch.anniversaryDate,anniversaryStartAtOne:ch.anniversaryStartAtOne,order:ch.order,createdAt:ch.createdAt,updatedAt:ch.updatedAt,cardImage:'',detailImage:'',refs:[],chapters:[],youtubeLinks:[],partnerImage:'',partnerImages:[]})),records:(snapshot.records||[]).map(record=>({id:record.id,title:record.title,description:record.locked?'':String(record.description||'').slice(0,350),locked:!!record.locked,__protectedV2:record.__protectedV2?{preview:true}:null,mainImage:'',chapters:record.locked?[]:(record.chapters||[]).map(chapter=>({id:chapter.id,name:chapter.name,groups:(chapter.groups||[]).map(group=>({id:group.id,name:group.name,promptBlocks:(group.promptBlocks||[]).map(block=>({id:block.id,name:block.name,locked:!!block.locked,__protectedV2:block.__protectedV2?{preview:true}:null,text:'',entries:block.locked?[]:(block.entries||[]).map(entry=>({id:entry.id,name:entry.name,text:String(entry.text||'').slice(0,450)})),image:''}))}))})),createdAt:record.createdAt,updatedAt:record.updatedAt,order:record.order})),logs:(snapshot.logs||[]).map(log=>({id:log.id,character:log.character,date:log.date,title:log.title,tags:log.tags,locked:log.locked,passwordHash:'',__protectedV2:log.__protectedV2?{preview:true}:null,text:log.locked?'':String(log.text||'').slice(0,300),input:''}))};
- let size=JSON.stringify(preview).length,limit=270000;
+ let size=JSON.stringify(preview).length,limit=650000;
  const addImage=async(target,key,source,maxSide,maxLength=26000)=>{if(size>=limit)return;const image=await sharePreviewImage(source,maxSide,Math.min(maxLength,limit-size));if(image&&size+image.length<limit){target[key]=image;size+=image.length}};
  // Give every character a small cover before using the remaining space for decoration.
- const cardBudget=Math.max(2200,Math.min(8500,Math.floor((limit-size-42000)/Math.max(1,preview.characters.length))));
+ const cardBudget=Math.max(10000,Math.min(22000,Math.floor((limit-size-52000)/Math.max(1,preview.characters.length))));
  const priority=preview.characters.map((_,i)=>i).sort((a,b)=>Number(snapshot.characters[b].featuredRole==='main')-Number(snapshot.characters[a].featuredRole==='main')||Number(snapshot.characters[b].featuredRole==='sub')-Number(snapshot.characters[a].featuredRole==='sub')||a-b);
- for(const i of priority)await addImage(preview.characters[i],'cardImage',snapshot.characters[i].cardImage||snapshot.characters[i].detailImage,120,cardBudget);
+ for(const i of priority)await addImage(preview.characters[i],'cardImage',snapshot.characters[i].cardImage||snapshot.characters[i].detailImage,480,cardBudget);
  for(let i=0;i<(preview.records||[]).length;i++)await addImage(preview.records[i],'mainImage',snapshot.records[i]?.mainImage,96,Math.min(5000,Math.floor((limit-size-15000)/Math.max(1,preview.records.length-i))));
  await addImage(preview.settings,'siteLogo',snapshot.settings?.siteLogo,96,6500);
  await addImage(preview.settings,'wallpaperImage',snapshot.settings?.wallpaperImage,480,18000);

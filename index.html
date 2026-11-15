@@ -2777,10 +2777,10 @@ function setPublicUi(){
  document.body.classList.toggle('public-view',publicMode);const badge=document.getElementById('publicBadge');if(badge&&publicMode)badge.textContent=`공개본 · ${requestedShareSlug}`;
  const brandSub=document.querySelector('.brand p');if(brandSub&&publicMode)brandSub.textContent='Character Prompt Archive';
 }
-function publicError(message){const grid=document.getElementById('grid');if(grid)grid.innerHTML=`<div class="publicLoadState"><strong>공개 도감을 불러오지 못했어요.</strong><span>${esc(message||'공유 링크나 서버 설정을 확인해 주세요.')}</span></div>`;const rc=document.getElementById('resultCount');if(rc)rc.textContent=`${requestedShareSlug} · 공개본`}
+function publicError(message){const screen=document.getElementById('publicBootScreen');document.documentElement.classList.add('public-booting');if(!screen)return;screen.innerHTML=`<div class="publicBootCard"><strong>공유본을 불러오지 못했어요.</strong><span>${esc(message||'잠시 후 다시 시도해 주세요.')}</span><button class="btn primary" type="button" id="retryPublicShare">다시 불러오기</button></div>`;screen.querySelector('#retryPublicShare').onclick=async()=>{screen.innerHTML='<div class="publicBootCard"><span class="publicBootSpinner"></span><span>공유본을 다시 불러오는 중이에요…</span></div>';const ok=await loadPublicShare();if(ok){renderAll();document.documentElement.classList.remove('public-booting')}}}
 function applyPublicSnapshot(payload){if(!payload||!Array.isArray(payload.characters))throw new Error('공개된 도감이 없어요.');invalidateGridCache();state=migrateState(payload);state.genres=(state.genres||[]).map(g=>({...g,viewLocked:false,viewPasswordHash:''}))}
 function publicShareRemoved(){document.documentElement.classList.add('public-booting');const screen=document.getElementById('publicBootScreen');screen.innerHTML='<div class="publicBootCard"><strong>공유가 해제되었어요.</strong><span>이 주소의 공개 도감을 더 이상 볼 수 없어요.</span></div>'}
-let publicPreviewPending=false,publicPreviewLoading=false,publicPreviewManifest=null,pendingPreviewOpen=null;
+let publicPreviewPending=false,publicPreviewLoading=false,publicPreviewManifest=null,pendingPreviewOpen=null,publicPreviewRetryCount=0;
 const publicCharacterLoads=new Map();
 async function loadPublicCharacter(manifest,id){
  const detail=manifest?.details?.[id];if(!detail)return false;
@@ -2807,7 +2807,7 @@ function previewDetailStatus(message,failed=false){
 function showPublicPreview(manifest){
  if(!manifest?.preview||!Array.isArray(manifest.preview.characters))return false;
  if($('#detailOverlay')?.classList.contains('open'))closeOverlay('detailOverlay',true);
- publicPreviewPending=true;publicPreviewManifest=manifest;sessionPrivateUnlocks.clear();sessionViewUnlocks.clear();applyPublicSnapshot(manifest.preview);renderAll();document.dispatchEvent(new Event('prompt-atlas-state-changed'));return true;
+ publicPreviewPending=true;publicPreviewManifest=manifest;publicPreviewRetryCount=0;document.documentElement.classList.remove('public-booting');sessionPrivateUnlocks.clear();sessionViewUnlocks.clear();applyPublicSnapshot(manifest.preview);renderAll();document.dispatchEvent(new Event('prompt-atlas-state-changed'));return true;
 }
 async function hydratePublicShare(manifest,announce=false,force=false){
  if(!force&&manifest?.details&&$('#detailOverlay')?.classList.contains('open')){setTimeout(()=>{if(publicPreviewManifest===manifest)void hydratePublicShare(manifest,announce)},2500);return}
@@ -2815,6 +2815,9 @@ async function hydratePublicShare(manifest,announce=false,force=false){
  try{
   let packed=manifest;const payload=await unpackSharePayload(manifest,p=>{packed=p});if(!payload||!Array.isArray(payload.characters))throw new Error('공유본 확인 실패');
   if(publicPreviewManifest!==manifest)return;
+  // Preserve every card from the first screen if a full payload is incomplete.
+  const loadedIds=new Set(payload.characters.map(ch=>ch.id));for(const ch of manifest.preview?.characters||[])if(!loadedIds.has(ch.id)){payload.characters.push(ch);loadedIds.add(ch.id)}
+  const loadedGenres=new Set((payload.genres||[]).map(g=>g.name));for(const genre of manifest.preview?.genres||[])if(!loadedGenres.has(genre.name)){payload.genres.push(genre);loadedGenres.add(genre.name)}
   const waiting=pendingPreviewOpen;pendingPreviewOpen=null;
   publicPreviewPending=false;publicPreviewManifest=null;applyPublicSnapshot(payload);
   if(waiting?.kind==='character'&&$('#detailOverlay')?.classList.contains('open')&&activeDetail===waiting.id){renderDetail()}
@@ -2823,7 +2826,7 @@ async function hydratePublicShare(manifest,announce=false,force=false){
   setTimeout(()=>{renderAll();document.dispatchEvent(new Event('prompt-atlas-state-changed'))},0);
   void writePublicShareCache(requestedShareSlug,packed).catch(()=>{});
   if(announce)toast('공유본의 새 내용을 불러왔어요');
- }catch(e){if(publicPreviewManifest===manifest){previewDetailStatus('상세 내용을 불러오지 못했어요. 연결을 확인하고 다시 시도해 주세요.',true);toast('상세 내용을 불러오지 못했어요. 다시 시도해 주세요.')}}
+ }catch(e){if(publicPreviewManifest===manifest){if(publicPreviewRetryCount++<2){setTimeout(()=>{if(publicPreviewManifest===manifest)void hydratePublicShare(manifest,announce)},2000*publicPreviewRetryCount)}else{previewDetailStatus('상세 내용을 불러오지 못했어요. 연결을 확인하고 다시 시도해 주세요.',true);toast('전체 내용을 불러오지 못했어요. 첫 화면의 캐릭터 목록은 유지됩니다.')}}}
  finally{publicPreviewLoading=false;if(publicPreviewPending&&publicPreviewManifest&&publicPreviewManifest!==manifest)void hydratePublicShare(publicPreviewManifest)}
 }
 document.addEventListener('click',event=>{
@@ -2852,14 +2855,17 @@ async function refreshPublicShare(cachedRevision){
  }catch(e){if(/no rows|not found/i.test(String(e?.message||''))){await deletePublicShareCache(requestedShareSlug).catch(()=>{});publicShareRemoved()}}
 }
 async function loadPublicShare(){
- await loadShareConfig();setPublicUi();if(!shareConfigured()){publicError('공유 서버가 아직 연결되지 않았어요. 사이트 관리자가 share-config.json을 설정해야 해요.');return false}
+ await loadShareConfig();setPublicUi();if(!shareConfigured()){publicError('공유 서버 연결 설정을 확인해 주세요.');return false}
+ const cached=await readPublicShareCache(requestedShareSlug).catch(()=>null);
  try{
-  const cached=await readPublicShareCache(requestedShareSlug).catch(()=>null);
-  if(cached){try{applyPublicSnapshot(await unpackSharePayload(cached.packed));setTimeout(()=>{void refreshPublicShare(cached.packed.__paRevision)},0);return true}catch{await deletePublicShareCache(requestedShareSlug).catch(()=>{})}}
-  const raw=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:requestedShareSlug.toLowerCase()}));
-  if(showPublicPreview(raw)){setTimeout(()=>{if(publicPreviewManifest===raw)void hydratePublicShare(raw)},raw.details?4000:0);return true}
-  let packed=raw;const payload=await unpackSharePayload(raw,p=>{packed=p});applyPublicSnapshot(payload);await writePublicShareCache(requestedShareSlug,packed).catch(()=>{});return true;
- }catch(e){publicError(String(e?.message||'공개된 도감을 찾지 못했어요.'));return false}
+  let raw;for(let attempt=0;attempt<3;attempt++){try{raw=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:requestedShareSlug.toLowerCase()}));break}catch(error){if(attempt===2)throw error;await new Promise(resolve=>setTimeout(resolve,600*(attempt+1)))}}
+  if(!raw)throw new Error('공유본을 찾을 수 없어요.');
+  if(showPublicPreview(raw)){void hydratePublicShare(raw);return true}
+  let packed=raw;const payload=await unpackSharePayload(raw,p=>{packed=p});applyPublicSnapshot(payload);document.documentElement.classList.remove('public-booting');void writePublicShareCache(requestedShareSlug,packed).catch(()=>{});return true;
+ }catch(e){
+  if(cached){try{applyPublicSnapshot(await unpackSharePayload(cached.packed));document.documentElement.classList.remove('public-booting');toast('저장된 공개본을 표시했어요. 새 내용을 다시 확인해 주세요.');return true}catch{await deletePublicShareCache(requestedShareSlug).catch(()=>{})}}
+  publicError(String(e?.message||'공유본을 불러오지 못했어요.'));return false
+ }
 }
 let state;
 try{state=migrateState(JSON.parse(localStorage.getItem('promptAtlasSharedStateV4CleanShare'))||JSON.parse(document.getElementById('promptAtlasSeed').textContent)||defaultState())}catch{state=defaultState()}
@@ -3660,11 +3666,11 @@ function renderShare(){
   const slug=String(slugInput.value||'').trim().toLowerCase();
   if(!slugOkay(slug)){setStatus('주소 이름을 확인해 주세요','2~40자의 영문 소문자·숫자·-·_만 사용할 수 있어요.','shareError');return}
   if(!shareConfigured()){setStatus('공유 서버 연결이 필요해요','공유 서버 연결 상태를 확인해 주세요.','shareError');return}
-  button.disabled=true;const token=ownerTokenFor(slug,true),revision=uid('publish');let packed,previousManifest=null,manifestAttempted=false,attemptedParts=[];
-  const verify=async()=>{try{const result=await shareRpc('pa_share_get',{p_slug:slug});return(result?.payload??result)?.__paRevision===revision}catch{return false}};
-  const finish=async()=>{if(previousManifest)scheduleShareCleanup(slug,token,previousManifest);await writePublicShareCache(slug,packed?.value).catch(()=>{});state.settings.lastShareSlug=slug;save();renderShare();const fresh=$('#sharePublishStatus');fresh.className='shareStatus shareSuccess';fresh.innerHTML=`<strong>공개 완료 ✨</strong><span>${esc(publicShareUrl(slug))}</span>`;toast('공유본 업데이트를 확인했어요')};
+  button.disabled=true;const token=ownerTokenFor(slug,true),revision=uid('publish');let packed,previousManifest=null,manifestAttempted=false,attemptedParts=[],expectedIds=[];
+  const verify=async()=>{try{const result=await shareRpc('pa_share_get',{p_slug:slug}),published=sharePayloadOf(result);if(published?.__paRevision!==revision)return false;const readback=await unpackSharePayload(published);const actual=(readback?.characters||[]).map(ch=>ch.id).sort();return JSON.stringify(actual)===JSON.stringify(expectedIds)}catch{return false}};
+  const finish=async()=>{if(previousManifest)scheduleShareCleanup(slug,token,previousManifest);await writePublicShareCache(slug,packed?.value).catch(()=>{});state.settings.lastShareSlug=slug;save();renderShare();const fresh=$('#sharePublishStatus');fresh.className='shareStatus shareSuccess';fresh.innerHTML=`<strong>공개 완료 ✨ · 캐릭터 ${expectedIds.length}명 확인</strong><span>${esc(publicShareUrl(slug))}</span>`;toast('공유본 업데이트를 확인했어요')};
   try{
-   setStatus('공유본 준비 중…','이미지 원본을 유지하면서 전송 데이터와 첫 화면을 준비하고 있어요.');const snapshot=await publicSnapshot();packed=await packSharePayload(snapshot,revision);
+   setStatus('공유본 준비 중…','이미지 원본을 유지하면서 전송 데이터와 첫 화면을 준비하고 있어요.');const snapshot=await publicSnapshot();expectedIds=snapshot.characters.map(ch=>ch.id).sort();if(new Set(expectedIds).size!==expectedIds.length)throw new Error('캐릭터 식별자가 중복돼 공유할 수 없어요. 백업 후 다시 시도해 주세요.');setStatus('공유본 준비 중…',`공개 대상 캐릭터 ${expectedIds.length}명을 확인했어요. 이미지를 전송용으로 준비하고 있어요.`);packed=await packSharePayload(snapshot,revision);
    const size=(packed.packedBytes/1024/1024).toFixed(1),chunkPlan=shareChunkDescriptors(packed,revision);
    if(chunkPlan){
     try{previousManifest=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:slug}))}catch{}
@@ -3679,7 +3685,7 @@ function renderShare(){
      else{const partSlug=`pc${revision.replace(/[^a-z0-9]/g,'').slice(-20)}${index.toString(36).padStart(3,'0')}`;detailSlugs.push(partSlug);attemptedParts.push({slug:partSlug});await shareRpc('pa_share_publish',{p_slug:partSlug,p_payload:single.value,p_token:token});details[ch.id]={slug:partSlug}}
      detailDone++;setStatus('캐릭터 상세 준비 중…',`${detailDone}/${snapshot.characters.length}명 완료. 이 창을 닫지 말아 주세요.`);
     });
-    setStatus('첫 화면 준비 중…','방문자가 바로 볼 수 있는 화면을 만들고 있어요.');const preview=await makePublicPreview(snapshot);
+    setStatus('첫 화면 준비 중…','방문자가 바로 볼 수 있는 화면을 만들고 있어요.');const preview=await makePublicPreview(snapshot);if(JSON.stringify(preview.characters.map(ch=>ch.id).sort())!==JSON.stringify(expectedIds))throw new Error('첫 화면의 캐릭터 목록이 일부 누락됐어요. 다시 시도해 주세요.');
     const manifest={__paFormat:SHARE_CHUNK_FORMAT,__paRevision:revision,encoding:packed.compressed?'gzip-base64':'json',totalLength:chunkPlan.encoded.length,chunks:chunkPlan.parts.map(({slug,length,hash})=>({slug,length,hash})),details,detailSlugs,preview};
     setStatus('업데이트 확인 중…','모든 조각을 저장했어요. 이제 공개 주소를 새 버전으로 바꿔 확인해요.');manifestAttempted=true;
     await shareRpc('pa_share_publish',{p_slug:slug,p_payload:manifest,p_token:token});
@@ -3687,7 +3693,7 @@ function renderShare(){
     setStatus('공개 중…',`전송 크기 ${size}MB · 저장한 뒤 다시 읽어 확인할게요.`);manifestAttempted=true;
     await shareRpc('pa_share_publish',{p_slug:slug,p_payload:packed.value,p_token:token});
    }
-   if(await verify())await finish();else setStatus('업데이트 확인 필요','서버 응답은 받았지만 새 공유본을 다시 읽어 확인하지 못했어요. 잠시 후 공유 링크를 확인해 주세요.','shareError');
+   if(await verify())await finish();else setStatus('업데이트 확인 필요',`서버의 캐릭터 목록을 다시 읽어 ${expectedIds.length}명과 대조하지 못했어요. 공유 링크를 확인한 뒤 다시 업데이트해 주세요.`,'shareError');
   }catch(e){
    if(await verify()){await finish();return}
    if(attemptedParts.length&&!manifestAttempted)scheduleShareCleanup(slug,token,{__paFormat:SHARE_CHUNK_FORMAT,chunks:attemptedParts},1000);
@@ -3740,7 +3746,7 @@ async function bootApp(){
       renderAll();sanitizeStoredMedia();
     }
   }finally{
-    document.documentElement.classList.remove('public-booting');
+    if(!publicMode||!document.querySelector('#retryPublicShare'))document.documentElement.classList.remove('public-booting');
     if(!document.documentElement.classList.contains('base-landing'))setTimeout(launchSiteOpeningEffect,40);
     window.promptAtlasReady=true;document.dispatchEvent(new Event('prompt-atlas-ready'));
   }

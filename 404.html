@@ -2557,7 +2557,8 @@ function normalizeSupabaseUrl(v){return String(v||'').trim().replace(/\/+$/,'')}
 function shareConfigFromSettings(){return{url:normalizeSupabaseUrl(state?.settings?.shareSupabaseUrl||''),key:String(state?.settings?.shareSupabaseAnonKey||'').trim()}}
 async function loadShareConfig(){
  let cfg={url:'',key:''};
- try{const r=await fetch('/share-config.json',{cache:'no-store'});if(r.ok){const j=await r.json();cfg={url:normalizeSupabaseUrl(j.supabaseUrl||j.url||''),key:String(j.supabaseAnonKey||j.anonKey||j.key||'').trim()}}}catch{}
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),3000);
+ try{const r=await fetch('/share-config.json',{cache:'no-store',signal:controller.signal});if(r.ok){const j=await r.json();cfg={url:normalizeSupabaseUrl(j.supabaseUrl||j.url||''),key:String(j.supabaseAnonKey||j.anonKey||j.key||'').trim()}}}catch{}finally{clearTimeout(timer)}
  const local=shareConfigFromSettings();shareBackendConfig={url:cfg.url||local.url,key:cfg.key||local.key};return shareBackendConfig;
 }
 function shareConfigured(){return !!(shareBackendConfig.url&&shareBackendConfig.key)}
@@ -2565,22 +2566,23 @@ async function shareRpc(name,args){
  if(!shareConfigured())throw new Error('share_backend_missing');
  const url=`${shareBackendConfig.url}/rest/v1/rpc/${name}`;
  const body=JSON.stringify(args||{});
- let lastError;
- for(let attempt=0;attempt<5;attempt++){
+ const maxAttempts=2;
+ for(let attempt=0;attempt<maxAttempts;attempt++){
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),name==='pa_share_get'?7000:18000);
   try{
-   const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','apikey':shareBackendConfig.key,'Authorization':`Bearer ${shareBackendConfig.key}`},body});
-   const text=await r.text();let data=null;try{data=text?JSON.parse(text):null}catch{data=text}
+   const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','apikey':shareBackendConfig.key,'Authorization':`Bearer ${shareBackendConfig.key}`},body,signal:controller.signal});
+   const responseText=await r.text();let data=null;try{data=responseText?JSON.parse(responseText):null}catch{data=responseText}
    if(r.ok)return data;
    const msg=(data&&typeof data==='object'&&(data.message||data.hint||data.details))||String(data||r.statusText);
-   const err=new Error(msg||'share_request_failed');err.status=r.status;throw err;
+   const err=new Error(msg||'share_request_failed');err.status=r.status;err.code=data?.code;throw err;
   }catch(error){
-   lastError=error;
-   const transient=!error?.status||error.status===429||error.status>=500||/schema cache|retrying|temporarily unavailable|statement timeout|timeout|57014|connection/i.test(String(error?.message||''));
-   if(!transient||attempt===4)throw error;
-   await new Promise(resolve=>setTimeout(resolve,800*Math.pow(2,attempt)+Math.floor(Math.random()*350)));
-  }
+   const schemaUnavailable=error?.code==='PGRST002'||/schema cache/i.test(String(error?.message||''));
+   if(error?.name==='AbortError')throw new Error('공유 서버 응답 시간이 초과됐어요. 잠시 후 다시 시도해 주세요.');
+   const transient=!error?.status||error.status===429||error.status>=500||/timeout|connection/i.test(String(error?.message||''));
+   if(schemaUnavailable||!transient||attempt===maxAttempts-1)throw error;
+   await new Promise(resolve=>setTimeout(resolve,350+Math.floor(Math.random()*250)));
+  }finally{clearTimeout(timer)}
  }
- throw lastError;
 }
 function slugOkay(v){return /^[a-z0-9][a-z0-9_-]{1,39}$/.test(String(v||'').trim().toLowerCase())}
 function shareBaseUrl(){return location.protocol==='http:'||location.protocol==='https:'?location.origin:'https://maro1021.github.io'}
@@ -2669,11 +2671,14 @@ function openPublicCacheDb(){
  if(!publicCacheDbPromise)publicCacheDbPromise=new Promise((resolve,reject)=>{const req=indexedDB.open('PromptAtlasPublicCacheV1',1);req.onupgradeneeded=()=>req.result.createObjectStore('shares');req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error||new Error('public_cache_open_failed'))}).catch(e=>{publicCacheDbPromise=null;throw e});
  return publicCacheDbPromise;
 }
-async function readPublicShareCache(slug){const db=await openPublicCacheDb();return new Promise((resolve,reject)=>{const req=db.transaction('shares','readonly').objectStore('shares').get(publicCacheKey(slug));req.onsuccess=()=>resolve(req.result?.packed?.__paRevision?req.result:null);req.onerror=()=>reject(req.error)})}
-async function writePublicShareCache(slug,packed){if(!packed?.__paRevision||packed.__paFormat===SHARE_CHUNK_FORMAT)return;const db=await openPublicCacheDb();return new Promise((resolve,reject)=>{const tx=db.transaction('shares','readwrite');tx.objectStore('shares').put({packed,savedAt:Date.now()},publicCacheKey(slug));tx.oncomplete=()=>resolve(true);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)})}
+async function readPublicShareCache(slug){const db=await openPublicCacheDb();return new Promise((resolve,reject)=>{const req=db.transaction('shares','readonly').objectStore('shares').get(publicCacheKey(slug));req.onsuccess=()=>resolve(req.result?.packed?.__paRevision||req.result?.preview?.__paRevision?req.result:null);req.onerror=()=>reject(req.error)})}
+async function writePublicShareCache(slug,packed){if(!packed?.__paRevision||packed.__paFormat===SHARE_CHUNK_FORMAT)return;const db=await openPublicCacheDb();return new Promise((resolve,reject)=>{const tx=db.transaction('shares','readwrite'),store=tx.objectStore('shares'),key=publicCacheKey(slug),req=store.get(key);req.onsuccess=()=>{const preview=req.result?.preview?.__paRevision===packed.__paRevision?req.result.preview:null;store.put({packed,preview,savedAt:Date.now()},key)};tx.oncomplete=()=>resolve(true);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)})}
+async function writePublicPreviewCache(slug,preview){if(preview?.__paFormat!==SHARE_CHUNK_FORMAT||!Array.isArray(preview.preview?.characters))return;const db=await openPublicCacheDb();return new Promise((resolve,reject)=>{const tx=db.transaction('shares','readwrite'),store=tx.objectStore('shares'),key=publicCacheKey(slug),req=store.get(key);req.onsuccess=()=>{const packed=req.result?.packed?.__paRevision===preview.__paRevision?req.result.packed:null;store.put({packed,preview,savedAt:Date.now()},key)};tx.oncomplete=()=>resolve(true);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)})}
 async function deletePublicShareCache(slug){const db=await openPublicCacheDb();return new Promise((resolve,reject)=>{const tx=db.transaction('shares','readwrite');tx.objectStore('shares').delete(publicCacheKey(slug));tx.oncomplete=()=>resolve(true);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)})}
 function sharePayloadOf(result){return result?.payload??result}
 function shareChunkHash(value){let h=2166136261>>>0;for(let i=0;i<value.length;i++)h=Math.imul(h^value.charCodeAt(i),16777619)>>>0;return h.toString(16)}
+async function shareContentHash(value){const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(value)));return Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('')}
+function shareDetailSlugs(detail){return detail?.slug?[detail.slug]:Array.isArray(detail?.chunks)?detail.chunks.map(chunk=>chunk.slug):[]}
 async function shareLimited(items,count,worker){let next=0,failure=null;await Promise.all(Array.from({length:Math.min(count,items.length)},async()=>{while(next<items.length&&!failure){const index=next++;try{await worker(items[index],index)}catch(e){failure=e}}}));if(failure)throw failure}
 function shareChunkDescriptors(packed,revision){
  const encoded=packed.compressed?packed.value.data:JSON.stringify(packed.value);
@@ -2685,7 +2690,7 @@ async function publishSharePart(part,index,revision,token){
  const payload={__paFormat:SHARE_PART_FORMAT,__paRevision:revision,index,data:part.data};
  for(let attempt=0;attempt<2;attempt++){
   try{await shareRpc('pa_share_publish',{p_slug:part.slug,p_payload:payload,p_token:token});return}
-  catch(e){try{const saved=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:part.slug}));if(saved?.__paRevision===revision&&saved.index===index&&saved.data.length===part.length&&shareChunkHash(saved.data)===part.hash)return}catch{}
+  catch(e){if(e.code==='PGRST002'||/schema cache/i.test(String(e.message)))throw e;try{const saved=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:part.slug}));if(saved?.__paRevision===revision&&saved.index===index&&saved.data.length===part.length&&shareChunkHash(saved.data)===part.hash)return}catch{}
    if(attempt||!(!e.status||e.status>=500||/timeout|57014/i.test(String(e.message))))throw e}
  }
 }
@@ -2695,7 +2700,7 @@ async function unpackChunkedShare(manifest,capturePacked){
  const parts=new Array(descriptors.length);
  await shareLimited(descriptors,navigator.connection?.saveData?2:6,async(d,index)=>{
   if(!slugOkay(d?.slug)||!Number.isSafeInteger(d.length)||d.length<1||d.length>SHARE_CHUNK_SIZE||typeof d.hash!=='string')throw new Error('공유본 조각 정보가 손상됐어요.');
-  let chunk;for(let attempt=0;attempt<3;attempt++){try{chunk=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:d.slug}));break}catch(error){if(attempt===2)throw error;await new Promise(resolve=>setTimeout(resolve,500*(attempt+1)))}}
+  const chunk=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:d.slug}));
   if(chunk?.__paFormat!==SHARE_PART_FORMAT||chunk.__paRevision!==manifest.__paRevision||chunk.index!==index||typeof chunk.data!=='string'||chunk.data.length!==d.length||shareChunkHash(chunk.data)!==d.hash)throw new Error('공유본을 완전히 읽지 못했어요. 잠시 후 다시 열어 주세요.');
   parts[index]=chunk.data;
  });
@@ -2705,9 +2710,9 @@ async function unpackChunkedShare(manifest,capturePacked){
 }
 const SHARE_CLEANUP_KEY='promptAtlasShareChunkCleanupV1';
 function shareCleanupQueue(){try{return JSON.parse(localStorage.getItem(SHARE_CLEANUP_KEY)||'[]')||[]}catch{return[]}}
-function scheduleShareCleanup(rootSlug,token,manifest,delay=120000){if(manifest?.__paFormat!==SHARE_CHUNK_FORMAT||!Array.isArray(manifest.chunks))return;const slugs=[...manifest.chunks.map(c=>c.slug),...(manifest.detailSlugs||[])];const queue=shareCleanupQueue();queue.push({rootSlug,token,slugs,due:Date.now()+delay});localStorage.setItem(SHARE_CLEANUP_KEY,JSON.stringify(queue));setTimeout(()=>{void flushShareCleanup()},delay+1000)}
+function scheduleShareCleanup(rootSlug,token,manifest,delay=120000,retainedSlugs=[]){if(manifest?.__paFormat!==SHARE_CHUNK_FORMAT||!Array.isArray(manifest.chunks))return;const retained=new Set(retainedSlugs),slugs=[...new Set([...manifest.chunks.map(c=>c.slug),...(manifest.detailSlugs||[])])].filter(slug=>!retained.has(slug));if(!slugs.length)return;const queue=shareCleanupQueue();queue.push({rootSlug,token,slugs,due:Date.now()+delay});localStorage.setItem(SHARE_CLEANUP_KEY,JSON.stringify(queue));setTimeout(()=>{void flushShareCleanup()},delay+1000)}
 let shareCleanupRunning=false;
-async function flushShareCleanup(){if(shareCleanupRunning||!shareConfigured())return;shareCleanupRunning=true;try{const queue=shareCleanupQueue(),keep=[];for(const item of queue){if(item.due>Date.now()){keep.push(item);continue}const failed=[];await shareLimited(item.slugs||[],2,async slug=>{try{await shareRpc('pa_share_delete',{p_slug:slug,p_token:item.token})}catch{failed.push(slug)}});if(failed.length)keep.push({...item,slugs:failed,due:Date.now()+60000})}localStorage.setItem(SHARE_CLEANUP_KEY,JSON.stringify(keep))}finally{shareCleanupRunning=false}}
+async function flushShareCleanup(){if(shareCleanupRunning||!shareConfigured())return;shareCleanupRunning=true;try{const queue=shareCleanupQueue(),keep=[];if(queue.some(item=>item.due<=Date.now()))try{await shareRpc('pa_share_get',{p_slug:queue[0].rootSlug})}catch{setTimeout(()=>{void flushShareCleanup()},60000);return}for(let index=0;index<queue.length;index++){const item=queue[index];if(item.due>Date.now()){keep.push(item);continue}let failed=[];for(let i=0;i<(item.slugs||[]).length;i++){try{await shareRpc('pa_share_delete',{p_slug:item.slugs[i],p_token:item.token})}catch{failed=item.slugs.slice(i);break}}if(failed.length){keep.push({...item,slugs:failed,due:Date.now()+60000},...queue.slice(index+1));break}}localStorage.setItem(SHARE_CLEANUP_KEY,JSON.stringify(keep));if(keep.length){const due=Math.min(...keep.map(item=>item.due||Date.now()+60000));setTimeout(()=>{void flushShareCleanup()},Math.max(1000,due-Date.now()+1000))}}finally{shareCleanupRunning=false}}
 function bytesToBase64(bytes){let out='';for(let i=0;i<bytes.length;i+=32768)out+=String.fromCharCode(...bytes.subarray(i,i+32768));return btoa(out)}
 function base64ToBytes(encoded){const raw=atob(encoded),bytes=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);return bytes}
 const PRIVATE_SHARE_FORMAT='prompt-atlas-private-aes-gcm-v1',PRIVATE_SHARE_ITERATIONS=600000;
@@ -2750,7 +2755,7 @@ async function sharePreviewImage(source,maxSide=480,maxLength=30000){
  return new Promise(resolve=>{
   const img=new Image();let settled=false;
   const done=value=>{if(settled)return;settled=true;clearTimeout(timer);resolve(value)};
-  const timer=setTimeout(()=>done(''),5000);
+  const timer=setTimeout(()=>done(''),3000);
   img.onload=()=>{try{const canvas=document.createElement('canvas');for(const [side,quality] of [[maxSide,.82],[Math.min(maxSide,360),.74],[Math.min(maxSide,240),.68],[Math.min(maxSide,160),.62]]){const scale=Math.min(1,side/Math.max(img.naturalWidth,img.naturalHeight));canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);const small=canvas.toDataURL('image/webp',quality);if(small.length<=maxLength){done(small);return}}done('')}catch{done('')}};
   img.onerror=()=>done('');img.src=src;
  });
@@ -2763,7 +2768,9 @@ async function makePublicPreview(snapshot){
  // Give every character a small cover before using the remaining space for decoration.
  const cardBudget=Math.max(10000,Math.min(22000,Math.floor((limit-size-52000)/Math.max(1,preview.characters.length))));
  const priority=preview.characters.map((_,i)=>i).sort((a,b)=>Number(snapshot.characters[b].featuredRole==='main')-Number(snapshot.characters[a].featuredRole==='main')||Number(snapshot.characters[b].featuredRole==='sub')-Number(snapshot.characters[a].featuredRole==='sub')||a-b);
- for(const i of priority)await addImage(preview.characters[i],'cardImage',snapshot.characters[i].cardImage||snapshot.characters[i].detailImage,480,cardBudget);
+ const covers=new Array(preview.characters.length);
+ await shareLimited(priority,4,async i=>{covers[i]=await sharePreviewImage(snapshot.characters[i].cardImage||snapshot.characters[i].detailImage,480,cardBudget)});
+ for(const i of priority)if(covers[i]&&size+covers[i].length<limit){preview.characters[i].cardImage=covers[i];size+=covers[i].length}
  for(let i=0;i<(preview.records||[]).length;i++)await addImage(preview.records[i],'mainImage',snapshot.records[i]?.mainImage,96,Math.min(5000,Math.floor((limit-size-15000)/Math.max(1,preview.records.length-i))));
  await addImage(preview.settings,'siteLogo',snapshot.settings?.siteLogo,96,6500);
  await addImage(preview.settings,'wallpaperImage',snapshot.settings?.wallpaperImage,480,18000);
@@ -2792,6 +2799,7 @@ function setPublicUi(){
  const brandSub=document.querySelector('.brand p');if(brandSub&&publicMode)brandSub.textContent='Character Prompt Archive';
 }
 function publicError(message){const screen=document.getElementById('publicBootScreen');document.documentElement.classList.add('public-booting');if(!screen)return;screen.innerHTML=`<div class="publicBootCard"><strong>공유본을 불러오지 못했어요.</strong><span>${esc(message||'잠시 후 다시 시도해 주세요.')}</span><button class="btn primary" type="button" id="retryPublicShare">다시 불러오기</button></div>`;screen.querySelector('#retryPublicShare').onclick=async()=>{screen.innerHTML='<div class="publicBootCard"><span class="publicBootSpinner"></span><span>공유본을 다시 불러오는 중이에요…</span></div>';const ok=await loadPublicShare();if(ok){renderAll();document.documentElement.classList.remove('public-booting')}}}
+function publicCacheStatus(stale){const badge=document.getElementById('publicBadge');if(badge)badge.textContent=stale?'저장된 공유본 · 최신 확인 필요':`공개본 · ${requestedShareSlug}`}
 function applyPublicSnapshot(payload){if(!payload||!Array.isArray(payload.characters))throw new Error('공개된 도감이 없어요.');invalidateGridCache();state=migrateState(payload);state.genres=(state.genres||[]).map(g=>({...g,viewLocked:false,viewPasswordHash:''}))}
 function publicShareRemoved(){document.documentElement.classList.add('public-booting');const screen=document.getElementById('publicBootScreen');screen.innerHTML='<div class="publicBootCard"><strong>공유가 해제되었어요.</strong><span>이 주소의 공개 도감을 더 이상 볼 수 없어요.</span></div>'}
 let publicPreviewPending=false,publicPreviewLoading=false,publicPreviewManifest=null,pendingPreviewOpen=null,publicPreviewRetryCount=0;
@@ -2840,7 +2848,7 @@ async function hydratePublicShare(manifest,announce=false,force=false){
   setTimeout(()=>{renderAll();document.dispatchEvent(new Event('prompt-atlas-state-changed'))},0);
   void writePublicShareCache(requestedShareSlug,packed).catch(()=>{});
   if(announce)toast('공유본의 새 내용을 불러왔어요');
- }catch(e){if(publicPreviewManifest===manifest){if(publicPreviewRetryCount++<2){setTimeout(()=>{if(publicPreviewManifest===manifest)void hydratePublicShare(manifest,announce)},2000*publicPreviewRetryCount)}else{previewDetailStatus('상세 내용을 불러오지 못했어요. 연결을 확인하고 다시 시도해 주세요.',true);toast('전체 내용을 불러오지 못했어요. 첫 화면의 캐릭터 목록은 유지됩니다.')}}}
+ }catch(e){if(publicPreviewManifest===manifest){if(e?.code!=='PGRST002'&&!/schema cache/i.test(String(e?.message||''))&&publicPreviewRetryCount++<2){setTimeout(()=>{if(publicPreviewManifest===manifest)void hydratePublicShare(manifest,announce)},2000*publicPreviewRetryCount)}else{publicCacheStatus(true);previewDetailStatus('상세 내용을 불러오지 못했어요. 연결을 확인하고 다시 시도해 주세요.',true);toast('전체 내용을 불러오지 못했어요. 첫 화면의 캐릭터 목록은 유지됩니다.')}}}
  finally{publicPreviewLoading=false;if(publicPreviewPending&&publicPreviewManifest&&publicPreviewManifest!==manifest)void hydratePublicShare(publicPreviewManifest)}
 }
 document.addEventListener('click',event=>{
@@ -2860,25 +2868,31 @@ async function refreshPublicShare(cachedRevision){
  try{
   const raw=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:requestedShareSlug.toLowerCase()}));
   if(!raw){await deletePublicShareCache(requestedShareSlug).catch(()=>{});publicShareRemoved();return}
-  if(raw.__paRevision===cachedRevision)return;
- if(showPublicPreview(raw)){setTimeout(()=>{if(publicPreviewManifest===raw)void hydratePublicShare(raw,true)},raw.details?4000:0);return}
+  publicCacheStatus(false);
+  if(raw.__paRevision===cachedRevision){if(publicPreviewPending&&showPublicPreview(raw)){void writePublicPreviewCache(requestedShareSlug,raw).catch(()=>{});void hydratePublicShare(raw)}return}
+  if(showPublicPreview(raw)){void writePublicPreviewCache(requestedShareSlug,raw).catch(()=>{});void hydratePublicShare(raw,true);return}
   let packed=raw;const payload=await unpackSharePayload(raw,p=>{packed=p});if(!payload||!Array.isArray(payload.characters))throw new Error('공유본 확인 실패');
   await writePublicShareCache(requestedShareSlug,packed).catch(()=>{});
   if($('#detailOverlay')?.classList.contains('open'))closeOverlay('detailOverlay',true);
   sessionPrivateUnlocks.clear();sessionViewUnlocks.clear();applyPublicSnapshot(payload);renderAll();sanitizeStoredMedia();document.dispatchEvent(new Event('prompt-atlas-state-changed'));toast('공유본의 새 내용을 불러왔어요');
- }catch(e){if(/no rows|not found/i.test(String(e?.message||''))){await deletePublicShareCache(requestedShareSlug).catch(()=>{});publicShareRemoved()}}
+ }catch(e){if(/no rows|not found/i.test(String(e?.message||''))){await deletePublicShareCache(requestedShareSlug).catch(()=>{});publicShareRemoved()}else{publicCacheStatus(true);toast('저장된 공유본을 표시 중이에요. 서버에서 최신 내용을 확인하지 못했어요.')}}
 }
 async function loadPublicShare(){
  await loadShareConfig();setPublicUi();if(!shareConfigured()){publicError('공유 서버 연결 설정을 확인해 주세요.');return false}
- const cached=await readPublicShareCache(requestedShareSlug).catch(()=>null);
+ const cached=await Promise.race([readPublicShareCache(requestedShareSlug).catch(()=>null),new Promise(resolve=>setTimeout(()=>resolve(null),1500))]);
+ if(cached){try{
+  if(cached.packed){applyPublicSnapshot(await unpackSharePayload(cached.packed));document.documentElement.classList.remove('public-booting')}
+  else if(cached.preview){showPublicPreview(cached.preview)}
+  else throw new Error('저장된 공유본이 없어요.');
+  publicCacheStatus(true);void refreshPublicShare(cached.packed?.__paRevision||cached.preview?.__paRevision);return true;
+ }catch{await deletePublicShareCache(requestedShareSlug).catch(()=>{})}}
  try{
-  let raw;for(let attempt=0;attempt<3;attempt++){try{raw=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:requestedShareSlug.toLowerCase()}));break}catch(error){if(attempt===2)throw error;await new Promise(resolve=>setTimeout(resolve,600*(attempt+1)))}}
+  const raw=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:requestedShareSlug.toLowerCase()}));
   if(!raw)throw new Error('공유본을 찾을 수 없어요.');
-  if(showPublicPreview(raw)){void hydratePublicShare(raw);return true}
+  if(showPublicPreview(raw)){void writePublicPreviewCache(requestedShareSlug,raw).catch(()=>{});void hydratePublicShare(raw);return true}
   let packed=raw;const payload=await unpackSharePayload(raw,p=>{packed=p});applyPublicSnapshot(payload);document.documentElement.classList.remove('public-booting');void writePublicShareCache(requestedShareSlug,packed).catch(()=>{});return true;
  }catch(e){
-  if(cached){try{applyPublicSnapshot(await unpackSharePayload(cached.packed));document.documentElement.classList.remove('public-booting');toast('저장된 공개본을 표시했어요. 새 내용을 다시 확인해 주세요.');return true}catch{await deletePublicShareCache(requestedShareSlug).catch(()=>{})}}
-  publicError(String(e?.message||'공유본을 불러오지 못했어요.'));return false
+  publicError(/schema cache|PGRST002/i.test(String(e?.message||''))?'공유 서버가 데이터베이스를 읽지 못하고 있어요. 서버 설정을 확인해 주세요.':String(e?.message||'공유본을 불러오지 못했어요.'));return false
  }
 }
 let state;
@@ -3680,27 +3694,36 @@ function renderShare(){
   const slug=String(slugInput.value||'').trim().toLowerCase();
   if(!slugOkay(slug)){setStatus('주소 이름을 확인해 주세요','2~40자의 영문 소문자·숫자·-·_만 사용할 수 있어요.','shareError');return}
   if(!shareConfigured()){setStatus('공유 서버 연결이 필요해요','공유 서버 연결 상태를 확인해 주세요.','shareError');return}
-  button.disabled=true;const token=ownerTokenFor(slug,true),revision=uid('publish');let packed,previousManifest=null,manifestAttempted=false,attemptedParts=[],expectedIds=[];
-  const verify=async()=>{try{const result=await shareRpc('pa_share_get',{p_slug:slug}),published=sharePayloadOf(result);if(published?.__paRevision!==revision)return false;const readback=await unpackSharePayload(published);const actual=(readback?.characters||[]).map(ch=>ch.id).sort();return JSON.stringify(actual)===JSON.stringify(expectedIds)}catch{return false}};
-  const finish=async()=>{if(previousManifest)scheduleShareCleanup(slug,token,previousManifest);await writePublicShareCache(slug,packed?.value).catch(()=>{});state.settings.lastShareSlug=slug;save();renderShare();const fresh=$('#sharePublishStatus');fresh.className='shareStatus shareSuccess';fresh.innerHTML=`<strong>공개 완료 ✨ · 캐릭터 ${expectedIds.length}명 확인</strong><span>${esc(publicShareUrl(slug))}</span>`;toast('공유본 업데이트를 확인했어요')};
+  button.disabled=true;const token=ownerTokenFor(slug,true),revision=uid('publish');let packed,previousManifest=null,manifestAttempted=false,attemptedParts=[],expectedIds=[],newDetailSlugs=[];
+  const verify=async()=>{try{
+   const result=await shareRpc('pa_share_get',{p_slug:slug}),published=sharePayloadOf(result);if(published?.__paRevision!==revision)return false;
+   if(published.__paFormat===SHARE_CHUNK_FORMAT){const actual=(published.preview?.characters||[]).map(ch=>ch.id).sort(),detailIds=Object.keys(published.details||{}).sort();return JSON.stringify(actual)===JSON.stringify(expectedIds)&&JSON.stringify(detailIds)===JSON.stringify(expectedIds)&&Array.isArray(published.chunks)&&published.chunks.length>0}
+   const readback=await unpackSharePayload(published),actual=(readback?.characters||[]).map(ch=>ch.id).sort();return JSON.stringify(actual)===JSON.stringify(expectedIds)
+  }catch{return false}};
+  const finish=async()=>{if(previousManifest)scheduleShareCleanup(slug,token,previousManifest,120000,newDetailSlugs);await writePublicShareCache(slug,packed?.value).catch(()=>{});state.settings.lastShareSlug=slug;save();renderShare();const fresh=$('#sharePublishStatus');fresh.className='shareStatus shareSuccess';fresh.innerHTML=`<strong>공개 완료 ✨ · 캐릭터 ${expectedIds.length}명 확인</strong><span>${esc(publicShareUrl(slug))}</span>`;toast('공유본 업데이트를 확인했어요')};
   try{
-   setStatus('공유본 준비 중…','이미지 원본을 유지하면서 전송 데이터와 첫 화면을 준비하고 있어요.');const snapshot=await publicSnapshot();expectedIds=snapshot.characters.map(ch=>ch.id).sort();if(new Set(expectedIds).size!==expectedIds.length)throw new Error('캐릭터 식별자가 중복돼 공유할 수 없어요. 백업 후 다시 시도해 주세요.');setStatus('공유본 준비 중…',`공개 대상 캐릭터 ${expectedIds.length}명을 확인했어요. 이미지를 전송용으로 준비하고 있어요.`);packed=await packSharePayload(snapshot,revision);
+   setStatus('공유 서버 확인 중…','서버에서 공개 주소를 확인하고 있어요.');previousManifest=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:slug}));
+   setStatus('공유본 준비 중…','이미지 원본을 유지하면서 전송 데이터와 첫 화면을 준비하고 있어요.');const snapshot=await publicSnapshot();expectedIds=snapshot.characters.map(ch=>ch.id).sort();if(new Set(expectedIds).size!==expectedIds.length)throw new Error('캐릭터 식별자가 중복돼 공유할 수 없어요. 백업 후 다시 시도해 주세요.');setStatus('공유본 준비 중…',`공개 대상 캐릭터 ${expectedIds.length}명을 확인했어요.`);
+   const snapshotHash=await shareContentHash(snapshot);
+   setStatus('공유본 준비 중…','이미지를 전송용으로 준비하고 있어요.');packed=await packSharePayload(snapshot,revision);
    const size=(packed.packedBytes/1024/1024).toFixed(1),chunkPlan=shareChunkDescriptors(packed,revision);
    if(chunkPlan){
-    try{previousManifest=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:slug}))}catch{}
     let done=0;setStatus('공유본 전송 중…',`${size}MB를 ${chunkPlan.parts.length}개로 나눠 저장해요. 이 창을 닫지 말아 주세요. (0/${chunkPlan.parts.length})`);
-    await shareLimited(chunkPlan.parts,1,async(part,index)=>{attemptedParts.push(part);await publishSharePart(part,index,revision,token);done++;setStatus('공유본 전송 중…',`${size}MB · 저장 완료 ${done}/${chunkPlan.parts.length}. 이 창을 닫지 말아 주세요.`)});
+    await shareLimited(chunkPlan.parts,2,async(part,index)=>{attemptedParts.push(part);await publishSharePart(part,index,revision,token);done++;setStatus('공유본 전송 중…',`${size}MB · 저장 완료 ${done}/${chunkPlan.parts.length}. 이 창을 닫지 말아 주세요.`)});
     setStatus('캐릭터 상세 준비 중…','캐릭터를 누르면 바로 열 수 있도록 개별 내용을 저장하고 있어요.');
     const details={},detailSlugs=[];let detailDone=0;
-    await shareLimited(snapshot.characters,1,async(ch,index)=>{
+    await shareLimited(snapshot.characters,2,async(ch,index)=>{
+     const contentHash=await shareContentHash(ch),prior=previousManifest?.details?.[ch.id],priorSlugs=shareDetailSlugs(prior);
+     if(prior?.contentHash===contentHash&&priorSlugs.length){details[ch.id]=prior;detailSlugs.push(...priorSlugs);detailDone++;setStatus('캐릭터 상세 준비 중…',`${detailDone}/${snapshot.characters.length}명 완료. 변경되지 않은 내용은 다시 전송하지 않아요.`);return}
      const single=await packSharePayload({version:snapshot.version,characters:[ch]},`${revision}-${index.toString(36)}`);
      const plan=shareChunkDescriptors(single,`${revision}-${index.toString(36)}`);
-     if(plan){for(let j=0;j<plan.parts.length;j++){const part=plan.parts[j];attemptedParts.push(part);detailSlugs.push(part.slug);await publishSharePart(part,j,`${revision}-${index.toString(36)}`,token)}details[ch.id]={__paFormat:SHARE_CHUNK_FORMAT,__paRevision:`${revision}-${index.toString(36)}`,encoding:single.compressed?'gzip-base64':'json',totalLength:plan.encoded.length,chunks:plan.parts.map(({slug,length,hash})=>({slug,length,hash}))}}
-     else{const partSlug=`pc${revision.replace(/[^a-z0-9]/g,'').slice(-20)}${index.toString(36).padStart(3,'0')}`;detailSlugs.push(partSlug);attemptedParts.push({slug:partSlug});await shareRpc('pa_share_publish',{p_slug:partSlug,p_payload:single.value,p_token:token});details[ch.id]={slug:partSlug}}
+     if(plan){for(let j=0;j<plan.parts.length;j++){const part=plan.parts[j];attemptedParts.push(part);detailSlugs.push(part.slug);await publishSharePart(part,j,`${revision}-${index.toString(36)}`,token)}details[ch.id]={__paFormat:SHARE_CHUNK_FORMAT,__paRevision:`${revision}-${index.toString(36)}`,encoding:single.compressed?'gzip-base64':'json',totalLength:plan.encoded.length,chunks:plan.parts.map(({slug,length,hash})=>({slug,length,hash})),contentHash}}
+     else{const partSlug=`pc${revision.replace(/[^a-z0-9]/g,'').slice(-20)}${index.toString(36).padStart(3,'0')}`;detailSlugs.push(partSlug);attemptedParts.push({slug:partSlug});await shareRpc('pa_share_publish',{p_slug:partSlug,p_payload:single.value,p_token:token});details[ch.id]={slug:partSlug,contentHash}}
      detailDone++;setStatus('캐릭터 상세 준비 중…',`${detailDone}/${snapshot.characters.length}명 완료. 이 창을 닫지 말아 주세요.`);
     });
+    newDetailSlugs=detailSlugs;
     setStatus('첫 화면 준비 중…','방문자가 바로 볼 수 있는 화면을 만들고 있어요.');const preview=await makePublicPreview(snapshot);if(JSON.stringify(preview.characters.map(ch=>ch.id).sort())!==JSON.stringify(expectedIds))throw new Error('첫 화면의 캐릭터 목록이 일부 누락됐어요. 다시 시도해 주세요.');
-    const manifest={__paFormat:SHARE_CHUNK_FORMAT,__paRevision:revision,encoding:packed.compressed?'gzip-base64':'json',totalLength:chunkPlan.encoded.length,chunks:chunkPlan.parts.map(({slug,length,hash})=>({slug,length,hash})),details,detailSlugs,preview};
+    const manifest={__paFormat:SHARE_CHUNK_FORMAT,__paRevision:revision,snapshotHash,encoding:packed.compressed?'gzip-base64':'json',totalLength:chunkPlan.encoded.length,chunks:chunkPlan.parts.map(({slug,length,hash})=>({slug,length,hash})),details,detailSlugs,preview};
     setStatus('업데이트 확인 중…','모든 조각을 저장했어요. 이제 공개 주소를 새 버전으로 바꿔 확인해요.');manifestAttempted=true;
     await shareRpc('pa_share_publish',{p_slug:slug,p_payload:manifest,p_token:token});
    }else{
@@ -3709,10 +3732,10 @@ function renderShare(){
    }
    if(await verify())await finish();else setStatus('업데이트 확인 필요',`서버의 캐릭터 목록을 다시 읽어 ${expectedIds.length}명과 대조하지 못했어요. 공유 링크를 확인한 뒤 다시 업데이트해 주세요.`,'shareError');
   }catch(e){
-   if(await verify()){await finish();return}
+   if(manifestAttempted&&await verify()){await finish();return}
    if(attemptedParts.length&&!manifestAttempted)scheduleShareCleanup(slug,token,{__paFormat:SHARE_CHUNK_FORMAT,chunks:attemptedParts},1000);
    const m=String(e?.message||'');
-   if(/schema cache|retrying/i.test(m)){setStatus('공유 서버 응답 지연', '서버가 여러 차례 재시도에도 응답하지 않았어요. 잠시 뒤 같은 주소로 다시 업데이트해 주세요. 이전 공유본과 PC의 저장 내용은 유지돼요.','shareError')}
+   if(/schema cache|PGRST002/i.test(m)||e?.code==='PGRST002'){setStatus('공유 서버 설정을 확인해 주세요', 'Supabase가 데이터베이스 정보를 읽지 못해 공개본 조회와 업데이트가 막혀 있어요. Supabase 프로젝트의 Database 상태와 Project Settings → Data API → Exposed Schemas를 확인해 주세요. 기존 공유본과 PC의 저장 내용은 유지돼요.','shareError')}
    else if(/slug_taken|already|owner|token/i.test(m)){setStatus('주소 권한을 확인해 주세요','이미 사용 중인 주소이거나 이 브라우저에 해당 주소의 공유 권한이 없어요. 기존 공유본은 그대로예요.','shareError')}
    else if(/statement timeout|timeout|57014/i.test(m)){setStatus('서버 시간 제한으로 업데이트 실패',`이전 공유본은 유지됐어요. ${packed?`전체 전송 크기 ${(packed.packedBytes/1024/1024).toFixed(1)}MB. `:''}조각 저장 중 시간 제한이 걸렸어요. ${m}`,'shareError')}
    else setStatus('공개하지 못했어요',m||'공유 서버 설정을 확인해 주세요.','shareError');

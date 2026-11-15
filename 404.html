@@ -2563,10 +2563,24 @@ async function loadShareConfig(){
 function shareConfigured(){return !!(shareBackendConfig.url&&shareBackendConfig.key)}
 async function shareRpc(name,args){
  if(!shareConfigured())throw new Error('share_backend_missing');
- const r=await fetch(`${shareBackendConfig.url}/rest/v1/rpc/${name}`,{method:'POST',headers:{'Content-Type':'application/json','apikey':shareBackendConfig.key,'Authorization':`Bearer ${shareBackendConfig.key}`},body:JSON.stringify(args||{})});
- const text=await r.text();let data=null;try{data=text?JSON.parse(text):null}catch{data=text}
- if(!r.ok){const msg=(data&&typeof data==='object'&&(data.message||data.hint||data.details))||String(data||r.statusText);const err=new Error(msg||'share_request_failed');err.status=r.status;throw err}
- return data;
+ const url=`${shareBackendConfig.url}/rest/v1/rpc/${name}`;
+ const body=JSON.stringify(args||{});
+ let lastError;
+ for(let attempt=0;attempt<5;attempt++){
+  try{
+   const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','apikey':shareBackendConfig.key,'Authorization':`Bearer ${shareBackendConfig.key}`},body});
+   const text=await r.text();let data=null;try{data=text?JSON.parse(text):null}catch{data=text}
+   if(r.ok)return data;
+   const msg=(data&&typeof data==='object'&&(data.message||data.hint||data.details))||String(data||r.statusText);
+   const err=new Error(msg||'share_request_failed');err.status=r.status;throw err;
+  }catch(error){
+   lastError=error;
+   const transient=!error?.status||error.status===429||error.status>=500||/schema cache|retrying|temporarily unavailable|statement timeout|timeout|57014|connection/i.test(String(error?.message||''));
+   if(!transient||attempt===4)throw error;
+   await new Promise(resolve=>setTimeout(resolve,800*Math.pow(2,attempt)+Math.floor(Math.random()*350)));
+  }
+ }
+ throw lastError;
 }
 function slugOkay(v){return /^[a-z0-9][a-z0-9_-]{1,39}$/.test(String(v||'').trim().toLowerCase())}
 function shareBaseUrl(){return location.protocol==='http:'||location.protocol==='https:'?location.origin:'https://maro1021.github.io'}
@@ -3675,10 +3689,10 @@ function renderShare(){
    if(chunkPlan){
     try{previousManifest=sharePayloadOf(await shareRpc('pa_share_get',{p_slug:slug}))}catch{}
     let done=0;setStatus('공유본 전송 중…',`${size}MB를 ${chunkPlan.parts.length}개로 나눠 저장해요. 이 창을 닫지 말아 주세요. (0/${chunkPlan.parts.length})`);
-    await shareLimited(chunkPlan.parts,3,async(part,index)=>{attemptedParts.push(part);await publishSharePart(part,index,revision,token);done++;setStatus('공유본 전송 중…',`${size}MB · 저장 완료 ${done}/${chunkPlan.parts.length}. 이 창을 닫지 말아 주세요.`)});
+    await shareLimited(chunkPlan.parts,1,async(part,index)=>{attemptedParts.push(part);await publishSharePart(part,index,revision,token);done++;setStatus('공유본 전송 중…',`${size}MB · 저장 완료 ${done}/${chunkPlan.parts.length}. 이 창을 닫지 말아 주세요.`)});
     setStatus('캐릭터 상세 준비 중…','캐릭터를 누르면 바로 열 수 있도록 개별 내용을 저장하고 있어요.');
     const details={},detailSlugs=[];let detailDone=0;
-    await shareLimited(snapshot.characters,4,async(ch,index)=>{
+    await shareLimited(snapshot.characters,1,async(ch,index)=>{
      const single=await packSharePayload({version:snapshot.version,characters:[ch]},`${revision}-${index.toString(36)}`);
      const plan=shareChunkDescriptors(single,`${revision}-${index.toString(36)}`);
      if(plan){for(let j=0;j<plan.parts.length;j++){const part=plan.parts[j];attemptedParts.push(part);detailSlugs.push(part.slug);await publishSharePart(part,j,`${revision}-${index.toString(36)}`,token)}details[ch.id]={__paFormat:SHARE_CHUNK_FORMAT,__paRevision:`${revision}-${index.toString(36)}`,encoding:single.compressed?'gzip-base64':'json',totalLength:plan.encoded.length,chunks:plan.parts.map(({slug,length,hash})=>({slug,length,hash}))}}
@@ -3698,7 +3712,8 @@ function renderShare(){
    if(await verify()){await finish();return}
    if(attemptedParts.length&&!manifestAttempted)scheduleShareCleanup(slug,token,{__paFormat:SHARE_CHUNK_FORMAT,chunks:attemptedParts},1000);
    const m=String(e?.message||'');
-   if(/slug_taken|already|owner|token/i.test(m)){setStatus('주소 권한을 확인해 주세요','이미 사용 중인 주소이거나 이 브라우저에 해당 주소의 공유 권한이 없어요. 기존 공유본은 그대로예요.','shareError')}
+   if(/schema cache|retrying/i.test(m)){setStatus('공유 서버 응답 지연', '서버가 여러 차례 재시도에도 응답하지 않았어요. 잠시 뒤 같은 주소로 다시 업데이트해 주세요. 이전 공유본과 PC의 저장 내용은 유지돼요.','shareError')}
+   else if(/slug_taken|already|owner|token/i.test(m)){setStatus('주소 권한을 확인해 주세요','이미 사용 중인 주소이거나 이 브라우저에 해당 주소의 공유 권한이 없어요. 기존 공유본은 그대로예요.','shareError')}
    else if(/statement timeout|timeout|57014/i.test(m)){setStatus('서버 시간 제한으로 업데이트 실패',`이전 공유본은 유지됐어요. ${packed?`전체 전송 크기 ${(packed.packedBytes/1024/1024).toFixed(1)}MB. `:''}조각 저장 중 시간 제한이 걸렸어요. ${m}`,'shareError')}
    else setStatus('공개하지 못했어요',m||'공유 서버 설정을 확인해 주세요.','shareError');
   }finally{if(button.isConnected)button.disabled=false}
